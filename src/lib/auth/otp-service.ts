@@ -9,7 +9,7 @@ import {
   verifyOtpCode,
   type OtpPurpose,
 } from "@/lib/security/otp";
-import { RateLimitError, ValidationError } from "@/lib/api/errors";
+import { InternalError, RateLimitError, ValidationError } from "@/lib/api/errors";
 import { fingerprintPayload } from "@/lib/security/crypto";
 
 export interface RequestOtpParams {
@@ -93,9 +93,14 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
     },
   });
 
-  // 5. Send Email
+  // 5. Send Email. A delivery failure must reach the caller: answering "a code is on
+  //    its way" for a message the provider rejected leaves the user waiting forever
+  //    with no signal to retry. The provider detail is logged and stored on the
+  //    email_logs row (never the code itself) and is only echoed to the client
+  //    outside production.
+  let emailResult: Awaited<ReturnType<typeof sendEmailNow>>;
   try {
-    await sendEmailNow({
+    emailResult = await sendEmailNow({
       to: normalisedEmail,
       templateKey: "otp_code",
       variables: {
@@ -106,11 +111,25 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
       userId: existingUser?.id,
     });
   } catch (err) {
-    logger.error("[auth] Failed to send OTP email", {
+    // dispatch() is written never to throw, but a failure before it enters its own
+    // try/catch (environment or database) must not be reported as "sent" either.
+    const detail = err instanceof Error ? err.message : "unknown error";
+    logger.error("[auth] OTP email dispatch crashed", {
       email: normalisedEmail,
-      error: err instanceof Error ? err.message : "unknown",
+      purpose: params.purpose,
+      error: detail,
     });
-    // In dev / test, continue; in prod, log and ensure client knows
+    throw new InternalError(otpDeliveryFailureMessage(env.NODE_ENV, detail));
+  }
+
+  if (!emailResult.delivered) {
+    logger.error("[auth] OTP email was not delivered", {
+      email: normalisedEmail,
+      purpose: params.purpose,
+      logId: emailResult.logId,
+      error: emailResult.error ?? "unknown error",
+    });
+    throw new InternalError(otpDeliveryFailureMessage(env.NODE_ENV, emailResult.error));
   }
 
   const [namePart, domainPart] = normalisedEmail.split("@");
@@ -183,4 +202,20 @@ export async function verifyOtp(params: VerifyOtpParams): Promise<{ valid: boole
   });
 
   return { valid: true, userId: latestOtp.userId ?? undefined };
+}
+
+/**
+ * Message for a failed OTP delivery.
+ *
+ * Production clients get a stable, information-free sentence (the raw provider
+ * error would otherwise leak configuration details such as sender addresses or
+ * API-key state to anonymous callers). Outside production the provider detail is
+ * appended, because that is the only place the developer sees it without opening
+ * the database. The full error is always in the server log and on the email_logs row.
+ */
+function otpDeliveryFailureMessage(nodeEnv: string | undefined, detail?: string): string {
+  const summary =
+    "We could not send the verification email right now. Please try again in a few minutes.";
+  if (nodeEnv === "production" || !detail) return summary;
+  return `${summary} (provider detail: ${detail.slice(0, 300)})`;
 }

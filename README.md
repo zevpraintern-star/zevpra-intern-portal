@@ -47,6 +47,7 @@ Requirements: Node 20+, PostgreSQL 14+, Redis 6+.
 |---|---|
 | `npm run worker` | Background job worker (emails, certificate PDFs, repo checks). Run beside the web app. |
 | `npm run dev:otp -- you@mail.com [PURPOSE]` | **Dev only.** Prints the latest one-time code (the console email driver never logs codes). |
+| `npm run email:logs -- [limit]` | Read-only email delivery audit from `email_logs`. Point `DATABASE_URL` at production to see why a code never arrived. |
 | `npm test` | Unit tests. |
 | `npm run test:integration` | Full flow + security tests against a real database and Redis. |
 | `npm run build` | Production build. |

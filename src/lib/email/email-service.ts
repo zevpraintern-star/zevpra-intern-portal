@@ -235,6 +235,16 @@ async function dispatch(input: SendEmailInput): Promise<SendEmailResult> {
     const failureMessage = error instanceof Error ? error.message : "unknown error";
     logger.error("[email] delivery failed", { templateKey: input.templateKey, error: failureMessage });
 
+    // Most common cause of a silent "sent": EMAIL_FROM was never overridden and is
+    // still the shipped placeholder. Brevo refuses senders it cannot verify, so name
+    // the misconfiguration explicitly instead of leaving it to be inferred.
+    if (/@(?:example|test)\.(?:com|org|net|io)\b/i.test(env.EMAIL_FROM)) {
+      logger.error(
+        "[email] EMAIL_FROM is still a placeholder address; Brevo only accepts verified senders. Set EMAIL_FROM to a sender verified in the Brevo dashboard.",
+        { emailFrom: env.EMAIL_FROM },
+      );
+    }
+
     if (logId) {
       await prisma.emailLog
         .update({
