@@ -29,7 +29,11 @@ function createRedisClient(url: string): Redis {
     keyPrefix: env.REDIS_PREFIX,
     lazyConnect: true,
     maxRetriesPerRequest: 2,
-    enableOfflineQueue: false,
+    // Keep the offline queue enabled: with lazyConnect the first command (e.g. a
+    // health ping) is issued before the TCP/TLS handshake finishes, and ioredis
+    // would otherwise reject it with "Stream isn't writeable and enableOfflineQueue
+    // options is false". Queueing until connected avoids that spurious failure.
+    enableOfflineQueue: true,
     connectTimeout: 5000,
     // Upstash blocks the INFO command that ioredis uses for its ready check, so
     // disable it there to avoid "Skipping the ready check because INFO command
