@@ -24,13 +24,22 @@ export function isRedisConfigured(): boolean {
 
 function createRedisClient(url: string): Redis {
   const env = getEnv();
+  const isUpstash = url.includes("upstash.io");
   return new Redis(url, {
     keyPrefix: env.REDIS_PREFIX,
     lazyConnect: true,
     maxRetriesPerRequest: 2,
     enableOfflineQueue: false,
     connectTimeout: 5000,
-    ...(env.REDIS_TLS ? { tls: { rejectUnauthorized: true } } : {}),
+    // Upstash blocks the INFO command that ioredis uses for its ready check, so
+    // disable it there to avoid "Skipping the ready check because INFO command
+    // fails" noise. Harmless for other providers.
+    enableReadyCheck: !isUpstash,
+    commandTimeout: 3000,
+    retryStrategy: (times) => Math.min(times * 50, 1000),
+    ...(env.REDIS_TLS || url.startsWith("rediss://")
+      ? { tls: { rejectUnauthorized: true } }
+      : {}),
   });
 }
 

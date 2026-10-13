@@ -60,7 +60,17 @@ export const envSchema = z
     PG_CONNECTION_TIMEOUT_MS: positiveInt(10000),
 
     // Redis ------------------------------------------------------------------
-    REDIS_URL: optionalString,
+    REDIS_URL: z.preprocess(
+      (v) => {
+        if (typeof v !== "string") return v;
+        // Strip surrounding quotes/whitespace so a value pasted as `"rediss://..."`
+        // (with wrapping quotes, e.g. copied from a quoted snippet) can never
+        // corrupt the connection string and produce a connect EINVAL error.
+        const cleaned = v.trim().replace(/^["'\s]+|["'\s]+$/g, "");
+        return cleaned === "" ? undefined : cleaned;
+      },
+      z.string().trim().optional(),
+    ),
     REDIS_PREFIX: z.preprocess(emptyToUndefined, z.string().trim().default("ip:")),
     REDIS_TLS: booleanish(false),
 
