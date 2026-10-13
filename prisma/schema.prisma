@@ -1,0 +1,1326 @@
+// ============================================================================
+// Zevpra Intern - Internship Platform
+// Prisma schema (Prisma ORM 7 / PostgreSQL)
+//
+// Conventions
+//  - UUID primary keys (v7 where the generator supports it) via @default(uuid(7))
+//  - snake_case table names via @@map, camelCase fields in TypeScript
+//  - created_at / updated_at on every mutable business table
+//  - Partial/unique indexes declared in the schema, never only in application code
+//
+// The datasource URL is intentionally NOT declared here: Prisma 7 resolves it
+// from prisma7.config.ts for the CLI and from the driver adapter at runtime.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum RoleKey {
+  STUDENT
+  MENTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OtpPurpose {
+  STUDENT_REGISTER
+  STUDENT_LOGIN
+  ADMIN_LOGIN
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+/// Student and admin sessions are stored in separate namespaces (SessionKind)
+/// so a stolen student cookie can never be replayed against /admin.
+enum SessionKind {
+  STUDENT
+  ADMIN
+}
+
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ProgramStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum BatchStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DROPPED
+}
+
+enum TaskStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TaskSubmissionType {
+  FILE
+  GITHUB_LINK
+  LIVE_URL
+  TEXT
+  MIXED
+}
+
+enum TaskAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Completion review of the final project. The GitHub repository link is a
+/// required part of this submission (product requirement), and an approved
+/// completion is a hard prerequisite for certificate eligibility.
+enum CompletionReviewStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  NOT_SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum CertificateStatus {
+  PENDING
+  GENERATED
+  REVOKED
+}
+
+enum NotificationType {
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  INTERNSHIP_STARTED
+  TASK_ASSIGNED
+  SUBMISSION_RECEIVED
+  SUBMISSION_APPROVED
+  SUBMISSION_REJECTED
+  SUBMISSION_CHANGES_REQUESTED
+  CERTIFICATE_ELIGIBLE
+  PAYMENT_SUBMITTED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  CERTIFICATE_ISSUED
+  ANNOUNCEMENT
+  SECURITY_ALERT
+  SYSTEM
+}
+
+enum AnnouncementAudience {
+  ALL
+  INTERNSHIP
+  DOMAIN
+  BATCH
+}
+
+enum AuditAction {
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  STUDENT_REGISTERED
+  STUDENT_LOGIN
+  STUDENT_LOGOUT
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  INTERNSHIP_ASSIGNED
+  STUDENT_SUSPENDED
+  STUDENT_REACTIVATED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  SUBMISSION_REVIEWED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  COMPLETION_SUBMITTED
+  COMPLETION_APPROVED
+  COMPLETION_REJECTED
+  CERTIFICATE_ELIGIBLE
+  PAYMENT_SUBMITTED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  CERTIFICATE_GENERATED
+  CERTIFICATE_REVOKED
+  ADMIN_CREATED
+  ADMIN_ROLE_CHANGED
+  SETTING_UPDATED
+  DOMAIN_CREATED
+  DOMAIN_UPDATED
+  DOMAIN_DELETED
+  PROGRAM_CREATED
+  PROGRAM_UPDATED
+  CONTACT_HANDLED
+  EXPORT_GENERATED
+  FILE_UPLOADED
+  FILE_DELETED
+}
+
+enum SecurityEventType {
+  OTP_FAILURE
+  RATE_LIMIT_EXCEEDED
+  AUTHORIZATION_FAILURE
+  SUSPICIOUS_ADMIN_LOGIN
+  REPEATED_PAYMENT_SUBMISSION
+  INVALID_CERTIFICATE_REQUEST
+  MALICIOUS_FILE_ATTEMPT
+  CSRF_FAILURE
+  SESSION_ANOMALY
+}
+
+enum SecuritySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FilePurpose {
+  RESUME
+  PAYMENT_SCREENSHOT
+  TASK_SUBMISSION
+  PROJECT_FILE
+  PROJECT_SCREENSHOT
+  CERTIFICATE_PDF
+  PAYMENT_QR
+  CERTIFICATE_TEMPLATE
+  AVATAR
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+  SKIPPED
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum JobType {
+  EMAIL
+  CERTIFICATE_PDF
+  CSV_EXPORT
+  FILE_SCAN
+  GITHUB_REPO_CHECK
+  NOTIFICATION
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ContactMessageStatus {
+  NEW
+  IN_REVIEW
+  RESOLVED
+  SPAM
+}
+
+enum SettingValueType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// ---------------------------------------------------------------------------
+// Identity and authentication
+// ---------------------------------------------------------------------------
+
+model User {
+  id               String     @id @default(uuid(7)) @db.Uuid
+  email            String     @unique @db.VarChar(255)
+  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(3)
+  name             String?    @db.VarChar(160)
+  phone            String?    @db.VarChar(20)
+  status           UserStatus @default(ACTIVE)
+  /// Admin credentials only. Students authenticate exclusively through email OTP.
+  passwordHash     String?    @map("password_hash")
+  /// TOTP secret for optional admin MFA (encrypted at rest by the application).
+  mfaSecret        String?    @map("mfa_secret")
+  mfaEnabled       Boolean    @default(false) @map("mfa_enabled")
+  lastLoginAt      DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  lastLoginIp      String?    @map("last_login_ip") @db.VarChar(45)
+  failedLoginCount Int        @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz(3)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  studentProfile             StudentProfile?
+  sessions                   Session[]
+  otpRequests                OtpRequest[]
+  roles                      UserRole[]                @relation("UserRoleUser")
+  grantedRoles               UserRole[]                @relation("UserRoleGrantedBy")
+  applications               Application[]             @relation("ApplicationStudent")
+  reviewedApplications       Application[]             @relation("ApplicationReviewer")
+  batchEnrollments           BatchStudent[]            @relation("BatchStudentUser")
+  mentoredBatches            Batch[]                   @relation("BatchMentor")
+  taskAssignments            TaskAssignment[]
+  taskSubmissions            TaskSubmission[]          @relation("TaskSubmissionStudent")
+  reviewedTaskSubmissions    TaskSubmission[]          @relation("TaskSubmissionReviewer")
+  projectSubmissions         ProjectSubmission[]       @relation("ProjectSubmissionStudent")
+  reviewedProjectSubmissions ProjectSubmission[]       @relation("ProjectSubmissionReviewer")
+  completions                InternshipCompletion[]    @relation("CompletionStudent")
+  reviewedCompletions        InternshipCompletion[]    @relation("CompletionReviewer")
+  paymentRequests            PaymentRequest[]          @relation("PaymentStudent")
+  reviewedPayments           PaymentRequest[]          @relation("PaymentReviewer")
+  certificates               Certificate[]             @relation("CertificateStudent")
+  revokedCertificates        Certificate[]             @relation("CertificateRevoker")
+  notifications              Notification[]
+  auditLogs                  AuditLog[]                @relation("AuditActor")
+  securityEvents             SecurityEvent[]
+  resolvedSecurityEvents     SecurityEvent[]           @relation("SecurityEventResolver")
+  fileAssets                 FileAsset[]
+  emailLogs                  EmailLog[]
+  createdDomains             Domain[]                  @relation("DomainCreator")
+  createdPrograms            InternshipProgram[]       @relation("ProgramCreator")
+  createdTasks               Task[]                    @relation("TaskCreator")
+  createdProjects            Project[]                 @relation("ProjectCreator")
+  createdAnnouncements       Announcement[]            @relation("AnnouncementCreator")
+  handledContactMessages     ContactMessage[]          @relation("ContactHandler")
+  updatedSettings            AppSetting[]              @relation("SettingUpdatedBy")
+  createdCertificateTemplates CertificateTemplate[]   @relation("CertificateTemplateCreator")
+  updatedEmailTemplates      EmailTemplate[]           @relation("EmailTemplateUpdatedBy")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+/// Extended student information, kept apart from the identity row so profile
+/// data can be deleted or exported independently (privacy requirement).
+model StudentProfile {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
+  fullName          String    @map("full_name") @db.VarChar(160)
+  mobile            String    @db.VarChar(20)
+  college           String    @db.VarChar(200)
+  university        String?   @db.VarChar(200)
+  degree            String    @db.VarChar(120)
+  branch            String    @db.VarChar(120)
+  yearOfStudy       Int       @map("year_of_study")
+  graduationYear    Int       @map("graduation_year")
+  state             String?   @db.VarChar(120)
+  city              String?   @db.VarChar(120)
+  country           String    @default("India") @db.VarChar(120)
+  preferredDomainId String?   @map("preferred_domain_id") @db.Uuid
+  githubUrl         String?   @map("github_url") @db.VarChar(500)
+  linkedinUrl       String?   @map("linkedin_url") @db.VarChar(500)
+  resumeFileId      String?   @unique @map("resume_file_id") @db.Uuid
+  termsAcceptedAt   DateTime  @map("terms_accepted_at") @db.Timestamptz(3)
+  privacyAcceptedAt DateTime  @map("privacy_accepted_at") @db.Timestamptz(3)
+  termsVersion      String    @map("terms_version") @db.VarChar(20)
+  privacyVersion    String    @map("privacy_version") @db.VarChar(20)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredDomain Domain?    @relation("StudentPreferredDomain", fields: [preferredDomainId], references: [id], onDelete: SetNull)
+  resumeFile      FileAsset? @relation("StudentResumeFile", fields: [resumeFileId], references: [id], onDelete: SetNull)
+
+  @@index([college])
+  @@index([preferredDomainId])
+  @@index([graduationYear])
+  @@map("student_profiles")
+}
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         RoleKey  @unique
+  name        String   @db.VarChar(80)
+  description String?  @db.VarChar(300)
+  /// System roles cannot be renamed or deleted from the admin panel.
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  description String?  @db.VarChar(300)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  roleId      String   @map("role_id") @db.Uuid
+  grantedById String?  @map("granted_by_id") @db.Uuid
+  grantedAt   DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+
+  user      User  @relation("UserRoleUser", fields: [userId], references: [id], onDelete: Cascade)
+  role      Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("UserRoleGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+/// Server-side session. The cookie holds a random opaque token; only its SHA-256
+/// digest is stored, so a database dump cannot be replayed as a live session.
+model Session {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  kind          SessionKind @default(STUDENT)
+  tokenHash     String      @unique @map("token_hash")
+  ipAddress     String?     @map("ip_address") @db.VarChar(45)
+  userAgent     String?     @map("user_agent") @db.VarChar(400)
+  /// Set when a session is rotated. The previous row is retained (not deleted)
+  /// so replay attempts after rotation are detectable.
+  rotatedFromId String?     @map("rotated_from_id") @db.Uuid
+  expiresAt     DateTime    @map("expires_at") @db.Timestamptz(3)
+  lastSeenAt    DateTime    @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz(3)
+  revokedReason String?     @map("revoked_reason") @db.VarChar(200)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("sessions")
+}
+
+/// One-time passwords. Never stored in plaintext, never logged, never returned
+/// by an API: the sender receives the code by email and only a keyed hash remains.
+model OtpRequest {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  email       String     @db.VarChar(255)
+  purpose     OtpPurpose
+  userId      String?    @map("user_id") @db.Uuid
+  codeHash    String     @map("code_hash")
+  /// Digest of the payload validated when the OTP was issued, so verification
+  /// does not have to trust client-provided state a second time.
+  payloadHash String?    @map("payload_hash")
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5) @map("max_attempts")
+  resendCount Int        @default(0) @map("resend_count")
+  ipAddress   String?    @map("ip_address") @db.VarChar(45)
+  userAgent   String?    @map("user_agent") @db.VarChar(400)
+  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(3)
+  consumedAt  DateTime?  @map("consumed_at") @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, createdAt])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("otp_requests")
+}
+
+/// Registry of every uploaded object. Private by default: access requires an
+/// authorization check plus a short-lived signed URL, never a public path.
+model FileAsset {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  ownerUserId    String?     @map("owner_user_id") @db.Uuid
+  purpose        FilePurpose
+  storageDriver  String      @map("storage_driver") @db.VarChar(20)
+  bucket         String?     @db.VarChar(120)
+  storageKey     String      @unique @map("storage_key") @db.VarChar(500)
+  originalName   String      @map("original_name") @db.VarChar(255)
+  mimeType       String      @map("mime_type") @db.VarChar(120)
+  extension      String      @db.VarChar(12)
+  sizeBytes      Int         @map("size_bytes")
+  checksumSha256 String?     @map("checksum_sha256") @db.VarChar(64)
+  isPrivate      Boolean     @default(true) @map("is_private")
+  scanStatus     ScanStatus  @default(PENDING) @map("scan_status")
+  scannedAt      DateTime?   @map("scanned_at") @db.Timestamptz(3)
+  downloadCount  Int         @default(0) @map("download_count")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  owner                  User?                 @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  studentResumeProfile   StudentProfile?       @relation("StudentResumeFile")
+  taskSubmissionFiles    TaskSubmissionFile[]
+  projectSubmissionFiles ProjectSubmissionFile[]
+  paymentScreenshots     PaymentScreenshot[]
+  certificatePdf         Certificate?          @relation("CertificatePdfFile")
+  certificateTemplates   CertificateTemplate[] @relation("CertificateTemplateFile")
+
+  @@index([ownerUserId, purpose])
+  @@index([purpose, createdAt])
+  @@index([scanStatus])
+  @@map("file_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue: domains and internship programs
+// ---------------------------------------------------------------------------
+
+/// Grouping for domains (Computer Science, Electronics, Mechanical, ...).
+/// Stored in the database so admins can add engineering branches without a deploy.
+model DomainCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  slug        String   @unique @db.VarChar(120)
+  name        String   @unique @db.VarChar(160)
+  description String?  @db.Text
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  domains Domain[]
+
+  @@index([isActive, sortOrder])
+  @@map("domain_categories")
+}
+
+/// A single internship domain (e.g. Cybersecurity, VLSI, Structural Engineering).
+/// Fully database driven: no domain name is hardcoded in the frontend.
+model Domain {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  categoryId       String   @map("category_id") @db.Uuid
+  slug             String   @unique @db.VarChar(160)
+  name             String   @unique @db.VarChar(160)
+  shortDescription String?  @map("short_description") @db.VarChar(300)
+  description      String?  @db.Text
+  /// Lucide icon name resolved at render time; free text, never evaluated.
+  iconName         String?  @map("icon_name") @db.VarChar(60)
+  isFeatured       Boolean  @default(false) @map("is_featured")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdById      String?  @map("created_by_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  category           DomainCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy          User?               @relation("DomainCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  programs           InternshipProgram[]
+  applications       Application[]
+  tasks              Task[]
+  announcements      Announcement[]
+  preferredByStudents StudentProfile[]   @relation("StudentPreferredDomain")
+
+  @@index([categoryId, isActive, sortOrder])
+  @@map("domains")
+}
+
+model InternshipProgram {
+  id                     String          @id @default(uuid(7)) @db.Uuid
+  slug                   String          @unique @db.VarChar(180)
+  title                  String          @db.VarChar(200)
+  domainId               String          @map("domain_id") @db.Uuid
+  summary                String          @db.VarChar(400)
+  description            String?         @db.Text
+  durationWeeks          Int             @map("duration_weeks")
+  durationLabel          String          @map("duration_label") @db.VarChar(60)
+  mode                   String          @default("ONLINE") @db.VarChar(40)
+  difficulty             DifficultyLevel @default(BEGINNER)
+  skills                 String[]        @default([])
+  prerequisites          String[]        @default([])
+  learningOutcomes       String[]        @default([])
+  certificateRequirements String?        @map("certificate_requirements") @db.Text
+  /// NULL means "use the platform-wide certificate fee from app_settings".
+  certificateFee         Decimal?        @map("certificate_fee") @db.Decimal(10, 2)
+  /// Internship participation itself is always free; kept explicit for clarity.
+  isFree                 Boolean         @default(true) @map("is_free")
+  status                 ProgramStatus   @default(DRAFT)
+  isFeatured             Boolean         @default(false) @map("is_featured")
+  startDate              DateTime?       @map("start_date") @db.Timestamptz(3)
+  endDate                DateTime?       @map("end_date") @db.Timestamptz(3)
+  /** Whether a final GitHub repository link is mandatory to finish the program. */
+  requiresFinalGithubLink Boolean        @default(true) @map("requires_final_github_link")
+  minTasksForCompletion  Int             @default(0) @map("min_tasks_for_completion")
+  createdById            String?         @map("created_by_id") @db.Uuid
+  publishedAt            DateTime?       @map("published_at") @db.Timestamptz(3)
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  domain         Domain                @relation(fields: [domainId], references: [id], onDelete: Restrict)
+  createdBy      User?                 @relation("ProgramCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  batches        Batch[]
+  applications   Application[]
+  tasks          Task[]
+  projects       Project[]
+  announcements  Announcement[]
+  completions    InternshipCompletion[]
+  paymentRequests PaymentRequest[]
+  certificates   Certificate[]
+
+  @@index([status, isFeatured])
+  @@index([domainId, status])
+  @@map("internship_programs")
+}
+
+// ---------------------------------------------------------------------------
+// Participation: batches, applications and enrollment
+// ---------------------------------------------------------------------------
+
+model Batch {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  programId String      @map("program_id") @db.Uuid
+  code      String      @unique @db.VarChar(60)
+  name      String      @db.VarChar(160)
+  mentorId  String?     @map("mentor_id") @db.Uuid
+  startDate DateTime    @map("start_date") @db.Timestamptz(3)
+  endDate   DateTime    @map("end_date") @db.Timestamptz(3)
+  capacity  Int?
+  status    BatchStatus @default(PLANNED)
+  notes     String?     @db.Text
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  program      InternshipProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  mentor       User?             @relation("BatchMentor", fields: [mentorId], references: [id], onDelete: SetNull)
+  students     BatchStudent[]
+  applications Application[]     @relation("BatchApplications")
+  announcements Announcement[]
+
+  @@index([programId, status])
+  @@index([startDate])
+  @@map("batches")
+}
+
+model BatchStudent {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  batchId       String           @map("batch_id") @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  applicationId String?          @unique @map("application_id") @db.Uuid
+  status        EnrollmentStatus @default(NOT_STARTED)
+  enrolledAt    DateTime         @default(now()) @map("enrolled_at") @db.Timestamptz(3)
+  completedAt   DateTime?        @map("completed_at") @db.Timestamptz(3)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  batch       Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  user        User         @relation("BatchStudentUser", fields: [userId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, userId])
+  @@index([userId, status])
+  @@map("batch_students")
+}
+
+/// An application doubles as the enrollment record: once APPROVED it carries the
+/// internship progress state used by the student portal and the admin dashboard.
+/// The unique constraint blocks duplicate applications for the same program.
+model Application {
+  id                   String           @id @default(uuid(7)) @db.Uuid
+  studentId            String           @map("student_id") @db.Uuid
+  programId            String           @map("program_id") @db.Uuid
+  domainId             String           @map("domain_id") @db.Uuid
+  batchId              String?          @map("batch_id") @db.Uuid
+  status               ApplicationStatus @default(PENDING)
+  motivation           String?          @db.VarChar(1000)
+  reviewNote           String?          @map("review_note") @db.VarChar(1000)
+  rejectionReason      String?          @map("rejection_reason") @db.VarChar(1000)
+  reviewedById         String?          @map("reviewed_by_id") @db.Uuid
+  reviewedAt           DateTime?        @map("reviewed_at") @db.Timestamptz(3)
+  startedAt            DateTime?        @map("started_at") @db.Timestamptz(3)
+  completedAt          DateTime?        @map("completed_at") @db.Timestamptz(3)
+  completionStatus     EnrollmentStatus @default(NOT_STARTED) @map("completion_status")
+  progressPercent      Int              @default(0) @map("progress_percent")
+  certificateEligibleAt DateTime?       @map("certificate_eligible_at") @db.Timestamptz(3)
+  /// Lightweight audit reference: who marked the student certificate eligible.
+  /// The authoritative record is the audit_logs entry for CERTIFICATE_ELIGIBLE.
+  certificateEligibleById String?       @map("certificate_eligible_by_id") @db.Uuid
+  /// Project the student chose after finishing their tasks. Set once, locked after the first submission.
+  selectedProjectId    String?          @map("selected_project_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student         User                  @relation("ApplicationStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewedBy      User?                 @relation("ApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  program         InternshipProgram     @relation(fields: [programId], references: [id], onDelete: Restrict)
+  domain          Domain                @relation(fields: [domainId], references: [id], onDelete: Restrict)
+  batch           Batch?                @relation("BatchApplications", fields: [batchId], references: [id], onDelete: SetNull)
+  selectedProject Project?              @relation("ApplicationSelectedProject", fields: [selectedProjectId], references: [id], onDelete: SetNull)
+  batchStudent    BatchStudent?
+  completions     InternshipCompletion[]
+  paymentRequests PaymentRequest[]
+  certificates    Certificate[]
+
+  @@unique([studentId, programId])
+  @@index([status, createdAt])
+  @@index([programId, status])
+  @@index([domainId, status])
+  @@index([certificateEligibleAt])
+  @@map("applications")
+}
+
+// ---------------------------------------------------------------------------
+// Tasks, task assignments and submissions
+// ---------------------------------------------------------------------------
+
+model Task {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  programId          String             @map("program_id") @db.Uuid
+  domainId           String?            @map("domain_id") @db.Uuid
+  title              String             @db.VarChar(200)
+  slug               String             @db.VarChar(200)
+  description        String             @db.Text
+  instructions       String?            @db.Text
+  difficulty         DifficultyLevel    @default(BEGINNER)
+  submissionType     TaskSubmissionType @default(MIXED) @map("submission_type")
+  /** When true a GitHub repository link is required on every submission. */
+  requiresGithubLink Boolean            @default(false) @map("requires_github_link")
+  deadline           DateTime?          @db.Timestamptz(3)
+  maxAttempts        Int                @default(1) @map("max_attempts")
+  points             Int                @default(10)
+  sortOrder          Int                @default(0) @map("sort_order")
+  status             TaskStatus         @default(DRAFT)
+  createdById        String?            @map("created_by_id") @db.Uuid
+  publishedAt        DateTime?          @map("published_at") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  program     InternshipProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  domain      Domain?           @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  createdBy   User?             @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments TaskAssignment[]
+  submissions TaskSubmission[]
+
+  @@unique([programId, slug])
+  @@index([programId, status, sortOrder])
+  @@index([deadline])
+  @@map("tasks")
+}
+
+/// Per-student task tracking. Created when a task is published (or assigned to a
+/// specific student) so deadlines, reminders and progress are queryable.
+model TaskAssignment {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  taskId           String               @map("task_id") @db.Uuid
+  studentId        String               @map("student_id") @db.Uuid
+  status           TaskAssignmentStatus @default(ASSIGNED)
+  dueAt            DateTime?            @map("due_at") @db.Timestamptz(3)
+  /// Lightweight audit reference to the admin/mentor who created the assignment.
+  assignedByUserId String?              @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime             @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  completedAt      DateTime?            @map("completed_at") @db.Timestamptz(3)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  task    Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, studentId])
+  @@index([studentId, status])
+  @@index([dueAt])
+  @@map("task_assignments")
+}
+
+model TaskSubmission {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  taskId         String           @map("task_id") @db.Uuid
+  studentId      String           @map("student_id") @db.Uuid
+  attemptNumber  Int              @default(1) @map("attempt_number")
+  status         SubmissionStatus @default(SUBMITTED)
+  githubUrl      String?          @map("github_url") @db.VarChar(500)
+  liveUrl        String?          @map("live_url") @db.VarChar(500)
+  explanation    String?          @db.Text
+  textAnswer     String?          @map("text_answer") @db.Text
+  hoursSpent     Int?             @map("hours_spent")
+  reviewedById   String?          @map("reviewed_by_id") @db.Uuid
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(3)
+  feedback       String?          @db.Text
+  pointsAwarded  Int?             @map("points_awarded")
+  submittedAt    DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  task       Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student    User                @relation("TaskSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewedBy User?               @relation("TaskSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  files      TaskSubmissionFile[]
+
+  @@unique([taskId, studentId, attemptNumber])
+  @@index([studentId, status])
+  @@index([taskId, status])
+  @@index([submittedAt])
+  @@map("task_submissions")
+}
+
+model TaskSubmissionFile {
+  taskSubmissionId String   @map("task_submission_id") @db.Uuid
+  fileId           String   @map("file_id") @db.Uuid
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  taskSubmission TaskSubmission @relation(fields: [taskSubmissionId], references: [id], onDelete: Cascade)
+  file           FileAsset      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([taskSubmissionId, fileId])
+  @@index([fileId])
+  @@map("task_submission_files")
+}
+
+// ---------------------------------------------------------------------------
+// Projects, project submissions and internship completion
+// ---------------------------------------------------------------------------
+
+model Project {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  programId          String             @map("program_id") @db.Uuid
+  title              String             @db.VarChar(200)
+  slug               String             @db.VarChar(200)
+  description        String             @db.Text
+  requirements       String[]           @default([])
+  skills             String[]           @default([])
+  submissionMethod   TaskSubmissionType @default(GITHUB_LINK) @map("submission_method")
+  /** Final projects always require a GitHub repository link. */
+  requiresGithubLink Boolean            @default(true) @map("requires_github_link")
+  requiresLiveUrl    Boolean            @default(false) @map("requires_live_url")
+  isFinalProject     Boolean            @default(false) @map("is_final_project")
+  deadline           DateTime?          @db.Timestamptz(3)
+  maxScore           Int                @default(100) @map("max_score")
+  sortOrder          Int                @default(0) @map("sort_order")
+  status             ProjectStatus      @default(DRAFT)
+  createdById        String?            @map("created_by_id") @db.Uuid
+  publishedAt        DateTime?          @map("published_at") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  program     InternshipProgram     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdBy   User?                 @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  submissions ProjectSubmission[]
+  selectedByApplications Application[] @relation("ApplicationSelectedProject")
+
+  @@unique([programId, slug])
+  @@index([programId, status, sortOrder])
+  @@map("projects")
+}
+
+model ProjectSubmission {
+  id              String           @id @default(uuid(7)) @db.Uuid
+  projectId       String           @map("project_id") @db.Uuid
+  studentId       String           @map("student_id") @db.Uuid
+  /// Mandatory: students finish every project with a public GitHub repository link.
+  githubUrl       String           @map("github_url") @db.VarChar(500)
+  liveUrl         String?          @map("live_url") @db.VarChar(500)
+  notes           String?          @db.Text
+  status          SubmissionStatus @default(SUBMITTED)
+  reviewedById    String?          @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?        @map("reviewed_at") @db.Timestamptz(3)
+  feedback        String?          @db.Text
+  score           Int?
+  /// Result of the asynchronous repository check (JobType.GITHUB_REPO_CHECK).
+  repoCheckStatus String?          @map("repo_check_status") @db.VarChar(30)
+  repoCheckedAt   DateTime?        @map("repo_checked_at") @db.Timestamptz(3)
+  submittedAt     DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project    Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  student    User                  @relation("ProjectSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewedBy User?                 @relation("ProjectSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  files      ProjectSubmissionFile[]
+
+  @@unique([projectId, studentId])
+  @@index([studentId, status])
+  @@index([projectId, status])
+  @@index([submittedAt])
+  @@map("project_submissions")
+}
+
+model ProjectSubmissionFile {
+  projectSubmissionId String   @map("project_submission_id") @db.Uuid
+  fileId              String   @map("file_id") @db.Uuid
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  projectSubmission ProjectSubmission @relation(fields: [projectSubmissionId], references: [id], onDelete: Cascade)
+  file              FileAsset         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([projectSubmissionId, fileId])
+  @@index([fileId])
+  @@map("project_submission_files")
+}
+
+/// Final hand-in required before a student can become certificate eligible.
+/// The GitHub repository link is mandatory here, and admin approval of this record
+/// is what unlocks the ₹50 certificate flow. Submitting it never issues a
+/// certificate by itself - only an authorized admin approval does.
+model InternshipCompletion {
+  id              String                 @id @default(uuid(7)) @db.Uuid
+  applicationId   String                 @unique @map("application_id") @db.Uuid
+  studentId       String                 @map("student_id") @db.Uuid
+  programId       String                 @map("program_id") @db.Uuid
+  githubUrl       String                 @map("github_url") @db.VarChar(500)
+  liveUrl         String?                @map("live_url") @db.VarChar(500)
+  summary         String?                @db.Text
+  status          CompletionReviewStatus @default(SUBMITTED)
+  repoCheckStatus String?                @map("repo_check_status") @db.VarChar(30)
+  repoCheckedAt   DateTime?              @map("repo_checked_at") @db.Timestamptz(3)
+  submittedAt     DateTime               @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  reviewedById    String?                @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?              @map("reviewed_at") @db.Timestamptz(3)
+  feedback        String?                @db.Text
+  approvedAt      DateTime?              @map("approved_at") @db.Timestamptz(3)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  application Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  student     User              @relation("CompletionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  program     InternshipProgram @relation(fields: [programId], references: [id], onDelete: Restrict)
+  reviewedBy  User?             @relation("CompletionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt])
+  @@index([programId, status])
+  @@index([studentId])
+  @@map("internship_completions")
+}
+
+// ---------------------------------------------------------------------------
+// Announcements and notifications
+// ---------------------------------------------------------------------------
+
+model Announcement {
+  id          String              @id @default(uuid(7)) @db.Uuid
+  title       String              @db.VarChar(200)
+  body        String              @db.Text
+  audience    AnnouncementAudience @default(ALL)
+  programId   String?             @map("program_id") @db.Uuid
+  domainId    String?             @map("domain_id") @db.Uuid
+  batchId     String?             @map("batch_id") @db.Uuid
+  isPublished Boolean             @default(false) @map("is_published")
+  publishedAt DateTime?           @map("published_at") @db.Timestamptz(3)
+  expiresAt   DateTime?           @map("expires_at") @db.Timestamptz(3)
+  createdById String?             @map("created_by_id") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  program   InternshipProgram? @relation(fields: [programId], references: [id], onDelete: Cascade)
+  domain    Domain?            @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  batch     Batch?             @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdBy User?              @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([isPublished, publishedAt])
+  @@index([audience])
+  @@map("announcements")
+}
+
+model Notification {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  body      String           @db.Text
+  link      String?          @db.VarChar(500)
+  metadata  Json?
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Manual UPI certificate payments (no payment gateway by design)
+// ---------------------------------------------------------------------------
+
+/// One payment request per student per program. The record is created in
+/// NOT_SUBMITTED state when the student becomes certificate eligible; uploading a
+/// screenshot and UTR only moves it to UNDER_REVIEW. A certificate is generated
+/// exclusively by an authorized admin approval.
+model PaymentRequest {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  applicationId   String        @map("application_id") @db.Uuid
+  studentId       String        @map("student_id") @db.Uuid
+  programId       String        @map("program_id") @db.Uuid
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("INR") @db.VarChar(3)
+  status          PaymentStatus @default(NOT_SUBMITTED)
+  /// UTR / transaction reference. Globally unique so the same reference cannot be
+  /// reused across students (a common manual-payment fraud pattern).
+  utr             String?       @unique @db.VarChar(40)
+  upiIdUsed       String?       @map("upi_id_used") @db.VarChar(160)
+  payerName       String?       @map("payer_name") @db.VarChar(160)
+  remarks         String?       @db.VarChar(1000)
+  submittedAt     DateTime?     @map("submitted_at") @db.Timestamptz(3)
+  reviewedById    String?       @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  rejectionReason String?       @map("rejection_reason") @db.VarChar(1000)
+  submissionCount Int           @default(0) @map("submission_count")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  application Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  student     User                @relation("PaymentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  program     InternshipProgram   @relation(fields: [programId], references: [id], onDelete: Restrict)
+  reviewedBy  User?               @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  screenshots PaymentScreenshot[]
+  certificate Certificate?
+
+  @@unique([studentId, programId])
+  @@index([status, submittedAt])
+  @@index([programId, status])
+  @@map("payment_requests")
+}
+
+model PaymentScreenshot {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  paymentRequestId String   @map("payment_request_id") @db.Uuid
+  fileId           String   @map("file_id") @db.Uuid
+  isPrimary        Boolean  @default(true) @map("is_primary")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  file           FileAsset      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentRequestId, fileId])
+  @@index([fileId])
+  @@map("payment_screenshots")
+}
+
+// ---------------------------------------------------------------------------
+// Certificates
+// ---------------------------------------------------------------------------
+
+/// An immutable snapshot of the student, program and domain details at issue
+/// time. Rendering never joins live profile data, so a later profile edit cannot
+/// silently change an already issued certificate.
+model Certificate {
+  id                  String            @id @default(uuid(7)) @db.Uuid
+  /// Human readable identifier printed on the certificate, e.g. CERT-7F3K9Q2M
+  certificateId       String            @unique @map("certificate_id") @db.VarChar(40)
+  /// Public verification token used in /verify-certificate/[verificationId]
+  verificationId      String            @unique @map("verification_id") @db.VarChar(64)
+  verificationUrl     String            @map("verification_url") @db.VarChar(500)
+  studentId           String            @map("student_id") @db.Uuid
+  programId           String            @map("program_id") @db.Uuid
+  applicationId       String?           @map("application_id") @db.Uuid
+  paymentRequestId    String?           @unique @map("payment_request_id") @db.Uuid
+  templateId          String?           @map("template_id") @db.Uuid
+  status              CertificateStatus @default(PENDING)
+  snapshotStudentName String            @map("snapshot_student_name") @db.VarChar(200)
+  snapshotProgramTitle String           @map("snapshot_program_title") @db.VarChar(200)
+  snapshotDomainName  String            @map("snapshot_domain_name") @db.VarChar(160)
+  snapshotDuration    String            @map("snapshot_duration") @db.VarChar(60)
+  snapshotCollege     String?           @map("snapshot_college") @db.VarChar(200)
+  completionDate      DateTime?         @map("completion_date") @db.Timestamptz(3)
+  issueDate           DateTime?         @map("issue_date") @db.Timestamptz(3)
+  pdfFileId           String?           @unique @map("pdf_file_id") @db.Uuid
+  generatedAt         DateTime?         @map("generated_at") @db.Timestamptz(3)
+  revokedAt           DateTime?         @map("revoked_at") @db.Timestamptz(3)
+  revokedById         String?           @map("revoked_by_id") @db.Uuid
+  revocationReason    String?           @map("revocation_reason") @db.VarChar(500)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student        User                @relation("CertificateStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  program        InternshipProgram   @relation(fields: [programId], references: [id], onDelete: Restrict)
+  application    Application?        @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  paymentRequest PaymentRequest?     @relation(fields: [paymentRequestId], references: [id], onDelete: SetNull)
+  template       CertificateTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  pdfFile        FileAsset?          @relation("CertificatePdfFile", fields: [pdfFileId], references: [id], onDelete: SetNull)
+  revokedBy      User?               @relation("CertificateRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([status, issueDate])
+  @@index([studentId])
+  @@index([programId, status])
+  @@map("certificates")
+}
+
+model CertificateTemplate {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  name            String   @db.VarChar(120)
+  version         Int      @default(1)
+  isActive        Boolean  @default(false) @map("is_active")
+  /// Layout tokens, colours and disclaimer text. Never contains legal or
+  /// accreditation claims unless configured with documented evidence.
+  config          Json
+  backgroundFileId String? @map("background_file_id") @db.Uuid
+  createdById     String?  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  backgroundFile FileAsset?    @relation("CertificateTemplateFile", fields: [backgroundFileId], references: [id], onDelete: SetNull)
+  createdBy      User?         @relation("CertificateTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  certificates   Certificate[]
+
+  @@unique([name, version])
+  @@index([isActive])
+  @@map("certificate_templates")
+}
+
+// ---------------------------------------------------------------------------
+// Email, background jobs and configuration
+// ---------------------------------------------------------------------------
+
+/// Admin-editable transactional email templates. The application ships safe
+/// defaults in code; a database row overrides subject/body for a given key.
+model EmailTemplate {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(160)
+  subject     String   @db.VarChar(300)
+  bodyHtml    String   @map("body_html") @db.Text
+  bodyText    String?  @map("body_text") @db.Text
+  description String?  @db.VarChar(400)
+  isActive    Boolean  @default(true) @map("is_active")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  updatedBy User? @relation("EmailTemplateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@map("email_templates")
+}
+
+/// Delivery audit trail. Contains no OTP values, tokens or passwords.
+model EmailLog {
+  id                String      @id @default(uuid(7)) @db.Uuid
+  userId            String?     @map("user_id") @db.Uuid
+  toEmail           String      @map("to_email") @db.VarChar(255)
+  templateKey       String      @map("template_key") @db.VarChar(80)
+  subject           String      @db.VarChar(300)
+  status            EmailStatus @default(QUEUED)
+  providerMessageId String?     @map("provider_message_id") @db.VarChar(200)
+  error             String?     @db.VarChar(1000)
+  attempts          Int         @default(0)
+  queuedAt          DateTime    @default(now()) @map("queued_at") @db.Timestamptz(3)
+  sentAt            DateTime?   @map("sent_at") @db.Timestamptz(3)
+  metadata          Json?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, queuedAt])
+  @@index([toEmail, queuedAt])
+  @@map("email_logs")
+}
+
+/// Durable work queue. Emails, PDF rendering, CSV exports and repository checks
+/// run here so API requests stay fast and survive a process restart.
+model BackgroundJob {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  type        JobType
+  status      JobStatus @default(QUEUED)
+  payload     Json
+  priority    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  /// Idempotency guard, e.g. "certificate:payment:<paymentRequestId>".
+  dedupeKey   String?   @unique @map("dedupe_key") @db.VarChar(200)
+  runAt       DateTime  @default(now()) @map("run_at") @db.Timestamptz(3)
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt  DateTime? @map("finished_at") @db.Timestamptz(3)
+  lastError   String?   @map("last_error") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, runAt, priority])
+  @@index([type, status])
+  @@map("background_jobs")
+}
+
+/// Runtime configuration. Payment settings (UPI ID, QR code reference, fee) live
+/// here rather than in code so admins can change them without a deployment.
+model AppSetting {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  key         String           @unique @db.VarChar(120)
+  valueJson   Json             @map("value_json")
+  valueType   SettingValueType @default(STRING) @map("value_type")
+  category    String           @default("general") @db.VarChar(60)
+  label       String?          @db.VarChar(200)
+  description String?          @db.VarChar(500)
+  isSecret    Boolean          @default(false) @map("is_secret")
+  updatedById String?          @map("updated_by_id") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  updatedBy User? @relation("SettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([category])
+  @@map("app_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Auditing, security monitoring and support content
+// ---------------------------------------------------------------------------
+
+/// Immutable trail of privileged and security-relevant actions. Never stores
+/// OTP values, passwords, session secrets or payment credentials.
+model AuditLog {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  actorUserId String?     @map("actor_user_id") @db.Uuid
+  actorRole   String?     @map("actor_role") @db.VarChar(40)
+  action      AuditAction
+  entityType  String      @map("entity_type") @db.VarChar(60)
+  entityId    String?     @map("entity_id") @db.VarChar(64)
+  ipAddress   String?     @map("ip_address") @db.VarChar(45)
+  userAgent   String?     @map("user_agent") @db.VarChar(400)
+  metadata    Json?
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model SecurityEvent {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  type         SecurityEventType
+  severity     SecuritySeverity  @default(LOW)
+  userId       String?           @map("user_id") @db.Uuid
+  email        String?           @db.VarChar(255)
+  ipAddress    String?           @map("ip_address") @db.VarChar(45)
+  userAgent    String?           @map("user_agent") @db.VarChar(400)
+  detail       Json?
+  resolvedAt   DateTime?         @map("resolved_at") @db.Timestamptz(3)
+  resolvedById String?           @map("resolved_by_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("SecurityEventResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([severity, resolvedAt])
+  @@index([ipAddress, createdAt])
+  @@map("security_events")
+}
+
+model ContactMessage {
+  id          String               @id @default(uuid(7)) @db.Uuid
+  name        String               @db.VarChar(160)
+  email       String               @db.VarChar(255)
+  subject     String               @db.VarChar(200)
+  message     String               @db.Text
+  status      ContactMessageStatus @default(NEW)
+  ipAddress   String?              @map("ip_address") @db.VarChar(45)
+  userAgent   String?              @map("user_agent") @db.VarChar(400)
+  handledById String?              @map("handled_by_id") @db.Uuid
+  handledAt   DateTime?            @map("handled_at") @db.Timestamptz(3)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  handledBy User? @relation("ContactHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("contact_messages")
+}
+
+model Faq {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  question    String   @db.VarChar(300)
+  answer      String   @db.Text
+  category    String   @default("general") @db.VarChar(60)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([isPublished, category, sortOrder])
+  @@map("faqs")
+}
+
+/// Homepage/marketing content blocks, editable without a deployment. Section 78
+/// of the specification defines which keys are seeded.
+model HomepageSection {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  title       String?  @db.VarChar(200)
+  subtitle    String?  @db.VarChar(400)
+  bodyJson    Json?    @map("body_json")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  sortOrder   Int      @default(0) @map("sort_order")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([isEnabled, sortOrder])
+  @@map("homepage_sections")
+}
+

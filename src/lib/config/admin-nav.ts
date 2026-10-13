@@ -1,0 +1,20 @@
+/** Admin navigation. `permission` hides links the signed-in role could not use; pages and actions re-check on the server. */
+export const ADMIN_NAV: ReadonlyArray<{ key: string; label: string; href: string; permission?: string }> = [
+  { key: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
+  { key: "students", label: "Students", href: "/admin/students", permission: "students.view" },
+  { key: "applications", label: "Applications", href: "/admin/applications", permission: "applications.review" },
+  { key: "submissions", label: "Submissions", href: "/admin/submissions", permission: "tasks.review" },
+  { key: "payments", label: "Payments", href: "/admin/payments", permission: "payments.view" },
+  { key: "certificates", label: "Certificates", href: "/admin/certificates", permission: "certificates.issue" },
+  { key: "programs", label: "Internships", href: "/admin/programs", permission: "programs.manage" },
+  { key: "tasks", label: "Tasks", href: "/admin/tasks", permission: "tasks.manage" },
+  { key: "projects", label: "Projects", href: "/admin/projects", permission: "projects.manage" },
+  { key: "domains", label: "Domains", href: "/admin/domains", permission: "domains.manage" },
+  { key: "content", label: "Content", href: "/admin/content", permission: "content.manage" },
+  { key: "announcements", label: "Announcements", href: "/admin/announcements", permission: "announcements.manage" },
+  { key: "messages", label: "Messages", href: "/admin/messages", permission: "messages.manage" },
+  { key: "security", label: "Security", href: "/admin/security", permission: "security.view" },
+  { key: "settings", label: "Settings", href: "/admin/settings", permission: "settings.manage" },
+  { key: "admins", label: "Administrators", href: "/admin/admins", permission: "admins.manage" },
+  { key: "account", label: "My account", href: "/admin/account" },
+];

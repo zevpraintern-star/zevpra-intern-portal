@@ -1,0 +1,349 @@
+@import "tailwindcss";
+
+/*
+ * Zevpra Intern design tokens.
+ *
+ * Tailwind CSS v4 CSS-first configuration. Colour values are stored as OKLCH and
+ * exposed to utilities through @theme inline, which keeps the palette accessible
+ * to `bg-background`, `text-foreground`, `border-border` and friends.
+ *
+ * Accessibility: dark and light themes both meet WCAG AA contrast, focus rings are
+ * always visible, and all non-essential motion is disabled when the visitor
+ * requests reduced motion.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+
+  /* Brand accents used by the 3D world and motion details. */
+  --brand-violet: #6a4cff;
+  --brand-cyan: #0b9db8;
+  --brand-amber: #d98a14;
+  /* Domain colours: must match PALETTES in components/3d/palette.ts. */
+  --domain-1: #0b8aa6;
+  --domain-2: #c2740a;
+  --domain-3: #d33a4a;
+  --domain-4: #2f9a52;
+
+  --background: oklch(0.995 0.002 264);
+  --foreground: oklch(0.19 0.02 264);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.02 264);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.02 264);
+
+  --primary: oklch(0.52 0.21 268);
+  --primary-foreground: oklch(0.99 0.005 264);
+
+  --secondary: oklch(0.96 0.01 264);
+  --secondary-foreground: oklch(0.3 0.03 264);
+
+  --muted: oklch(0.965 0.008 264);
+  --muted-foreground: oklch(0.52 0.02 264);
+
+  --accent: oklch(0.94 0.03 200);
+  --accent-foreground: oklch(0.26 0.05 220);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.005 264);
+
+  --success: oklch(0.62 0.15 150);
+  --success-foreground: oklch(0.99 0.005 264);
+
+  --warning: oklch(0.75 0.15 75);
+  --warning-foreground: oklch(0.22 0.04 75);
+
+  --border: oklch(0.91 0.01 264);
+  --input: oklch(0.91 0.01 264);
+  --ring: oklch(0.52 0.21 268);
+}
+
+.dark {
+  --brand-violet: #8a6bff;
+  --brand-cyan: #35e0ea;
+  --brand-amber: #ffb547;
+  --domain-1: #35e0ea;
+  --domain-2: #ffb547;
+  --domain-3: #ff6b6b;
+  --domain-4: #8cf08c;
+
+  --background: oklch(0.17 0.02 264);
+  --foreground: oklch(0.97 0.005 264);
+
+  --card: oklch(0.21 0.025 264);
+  --card-foreground: oklch(0.97 0.005 264);
+
+  --popover: oklch(0.21 0.025 264);
+  --popover-foreground: oklch(0.97 0.005 264);
+
+  --primary: oklch(0.72 0.16 268);
+  --primary-foreground: oklch(0.17 0.03 264);
+
+  --secondary: oklch(0.27 0.02 264);
+  --secondary-foreground: oklch(0.97 0.005 264);
+
+  --muted: oklch(0.25 0.02 264);
+  --muted-foreground: oklch(0.72 0.02 264);
+
+  --accent: oklch(0.3 0.04 210);
+  --accent-foreground: oklch(0.95 0.02 210);
+
+  --destructive: oklch(0.66 0.19 25);
+  --destructive-foreground: oklch(0.15 0.02 264);
+
+  --success: oklch(0.72 0.14 150);
+  --success-foreground: oklch(0.15 0.02 264);
+
+  --warning: oklch(0.8 0.14 80);
+  --warning-foreground: oklch(0.18 0.03 80);
+
+  --border: oklch(0.3 0.02 264);
+  --input: oklch(0.32 0.02 264);
+  --ring: oklch(0.72 0.16 268);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Fonts are self-hosted through @fontsource (imported in the root layout): no
+     third-party font request, so the strict CSP and offline builds keep working. */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "Liberation Mono",
+    monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    /* Prevents horizontal overflow on 320px viewports. */
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Visible, consistent focus indicator for keyboard users. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
+  }
+
+  .container-page {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 1rem;
+    max-width: 80rem;
+  }
+
+  @media (min-width: 640px) {
+    .container-page {
+      padding-inline: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container-page {
+      padding-inline: 2rem;
+    }
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Screen-reader-only content that still receives keyboard focus. */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/*
+ * Reduced motion (specification section 6): disable decorative animation,
+ * scroll smoothing and long transitions while keeping the site fully usable.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print styles for the certificate fallback (PDF generation is server side). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Motion and effect utilities                                               */
+/* ------------------------------------------------------------------------ */
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 48s linear infinite;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes cue-drop {
+  0% {
+    transform: translateY(-100%);
+  }
+  60%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.scroll-cue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent, var(--brand-cyan), transparent);
+  animation: cue-drop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.08);
+  }
+}
+
+.page-orb {
+  animation: drift 18s ease-in-out infinite;
+}
+
+/* Cursor-following highlight used by SpotlightCard. */
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 250ms ease;
+  background: radial-gradient(
+    380px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in oklch, var(--brand-violet) 22%, transparent),
+    transparent 60%
+  );
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+/* Readable panel that floats over the 3D world. */
+.world-panel {
+  background: color-mix(in oklch, var(--color-background) 62%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--color-foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 75%);
+}
+
+@keyframes float-card {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.float-card {
+  animation: float-card 7s ease-in-out infinite;
+}
