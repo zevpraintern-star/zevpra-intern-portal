@@ -12,7 +12,13 @@ export async function GET() {
     try {
       await client.ping();
       redis = "up";
-    } catch {
+    } catch (error) {
+      // Surface the real reason (WRONGPASS, NOPERM, timeout, ...) instead of
+      // silently reporting "down" — a swallowed error here is very hard to debug.
+      console.error(
+        "[health] redis ping failed:",
+        error instanceof Error ? error.message : error,
+      );
       redis = "down";
     }
   }
