@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { bool, num, runAction, str, strList, type ActionState } from "@/lib/api/action";
@@ -389,6 +389,7 @@ export async function changeStaffRoleAction(_: ActionState, form: FormData): Pro
     ]);
     await audit(actor, "ADMIN_ROLE_CHANGED", "User", userId, { from: current.map((c) => c.role.key), to: roleKey });
     revalidatePath("/admin", "layout");
+    revalidateTag("role-permissions");
     return "Role changed. Their sessions were signed out so the new permissions apply immediately.";
   });
 }

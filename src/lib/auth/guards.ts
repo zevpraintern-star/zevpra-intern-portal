@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ForbiddenError, UnauthenticatedError } from "@/lib/api/errors";
@@ -7,6 +8,25 @@ import { getPrisma } from "@/lib/db/prisma";
 
 export type StaffRole = "MENTOR" | "ADMIN" | "SUPER_ADMIN";
 const STAFF_ROLES: readonly string[] = ["MENTOR", "ADMIN", "SUPER_ADMIN"];
+
+/**
+ * Permission catalogue for a set of roles. The matrix only changes when an admin's role
+ * is changed - and that action revokes every one of their sessions and invalidates this
+ * cache through the "role-permissions" tag - so the lookup is cached for two minutes
+ * instead of running a role-permission query on every page render (one more database
+ * round trip per request).
+ */
+const cachedRolePermissions = unstable_cache(
+  async (roleKeys: string[]) => {
+    const rows = await getPrisma().rolePermission.findMany({
+      where: { role: { key: { in: roleKeys as never[] } } },
+      select: { permission: { select: { key: true } } },
+    });
+    return rows.map((row) => row.permission.key);
+  },
+  ["role-permissions"],
+  { revalidate: 120, tags: ["role-permissions"] },
+);
 
 export interface StudentContext {
   userId: string;
@@ -44,10 +64,7 @@ export async function loadStaffContext(session: ActiveSession): Promise<StaffCon
   const roles = session.user.roles.map((r) => r.role.key).filter((key) => STAFF_ROLES.includes(key));
   if (roles.length === 0) return null;
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
-  const rows = await getPrisma().rolePermission.findMany({
-    where: { role: { key: { in: roles as never[] } } },
-    select: { permission: { select: { key: true } } },
-  });
+  const permissionKeys = await cachedRolePermissions(roles);
   const primaryRole: StaffRole = isSuperAdmin ? "SUPER_ADMIN" : roles.includes("ADMIN") ? "ADMIN" : "MENTOR";
   return {
     userId: session.user.id,
@@ -55,7 +72,7 @@ export async function loadStaffContext(session: ActiveSession): Promise<StaffCon
     name: session.user.name,
     sessionId: session.id,
     roles,
-    permissions: new Set(rows.map((row) => row.permission.key)),
+    permissions: new Set(permissionKeys),
     isSuperAdmin,
     primaryRole,
   };
