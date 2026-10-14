@@ -10,6 +10,26 @@ export const POLICY_VERSIONS = {
   privacy: "2026-01",
 } as const;
 
+/**
+ * Country dialling codes offered next to the mobile-number field. India first and
+ * default; the rest cover the countries students of this platform commonly write
+ * from. Each entry pairs the dial code with the country name stored on the profile.
+ */
+export const COUNTRY_CODES = [
+  { dial: "+91", label: "India" },
+  { dial: "+1", label: "United States / Canada" },
+  { dial: "+44", label: "United Kingdom" },
+  { dial: "+61", label: "Australia" },
+  { dial: "+65", label: "Singapore" },
+  { dial: "+971", label: "United Arab Emirates" },
+  { dial: "+49", label: "Germany" },
+  { dial: "+977", label: "Nepal" },
+  { dial: "+94", label: "Sri Lanka" },
+  { dial: "+880", label: "Bangladesh" },
+  { dial: "+60", label: "Malaysia" },
+  { dial: "+27", label: "South Africa" },
+] as const;
+
 export const COOKIE_NAMES = {
   /** Student session cookie (HttpOnly). */
   studentSession: "ip_session",

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import { COUNTRY_CODES } from "@/lib/config/constants";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [countryCode, setCountryCode] = useState<string>("+91");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -81,7 +83,8 @@ export default function RegisterPage() {
       const payload = {
         ...formData,
         email,
-        country: "India",
+        mobile: `${countryCode}${formData.mobile}`,
+        country: COUNTRY_CODES.find((c) => c.dial === countryCode)?.label ?? "India",
         yearOfStudy: Number(formData.yearOfStudy),
         graduationYear: Number(formData.graduationYear),
       };
@@ -182,13 +185,31 @@ export default function RegisterPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mobile">Mobile Number</Label>
-                  <Input
-                    id="mobile"
-                    placeholder="+91 9876543210"
-                    required
-                    value={formData.mobile}
-                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  />
+                  <div className="flex">
+  <select
+    aria-label="Country code"
+    className="h-10 shrink-0 rounded-l-md rounded-r-none border border-input border-r-0 bg-background px-2 text-sm focus:outline-none"
+    value={countryCode}
+    onChange={(e) => setCountryCode(e.target.value)}
+  >
+    {COUNTRY_CODES.map((c) => (
+      <option key={c.dial} value={c.dial}>
+        {c.dial} {c.label}
+      </option>
+    ))}
+  </select>
+  <Input
+    id="mobile"
+    type="tel"
+    inputMode="numeric"
+    maxLength={10}
+    placeholder="9876543210"
+    required
+    className="rounded-l-none"
+    value={formData.mobile}
+    onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })}
+  />
+</div>
                 </div>
               </div>
 

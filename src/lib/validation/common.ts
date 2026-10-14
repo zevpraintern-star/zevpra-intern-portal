@@ -29,13 +29,17 @@ export const organisationNameSchema = z
   .min(2, "Enter at least 2 characters.")
   .max(200, "Value is too long.");
 
-/** Indian mobile numbers, optionally prefixed with +91 or 0. */
+/**
+ * Mobile numbers: an optional country code ("+" plus 1-3 digits, as produced by the
+ * registration form's country-code selector) or a leading 0, followed by exactly
+ * 10 digits. Bare 10-digit numbers (no prefix) are accepted unchanged.
+ */
 export const phoneSchema = z
   .string()
   .trim()
   .transform((value) => value.replace(/[\s-()]/g, ""))
-  .refine((value) => /^(\+91|91|0)?[6-9]\d{9}$/.test(value), {
-    message: "Enter a valid 10 digit Indian mobile number.",
+  .refine((value) => /^(\+\d{1,3}|0)?\d{10}$/.test(value), {
+    message: "Enter a valid 10 digit mobile number.",
   });
 
 /** https-only URLs. Plain http is rejected so uploaded links cannot downgrade. */
