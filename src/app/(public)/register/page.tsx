@@ -188,13 +188,13 @@ export default function RegisterPage() {
                   <div className="flex">
   <select
     aria-label="Country code"
-    className="h-10 shrink-0 rounded-l-md rounded-r-none border border-input border-r-0 bg-background px-2 text-sm focus:outline-none"
+    className="h-10 w-24 shrink-0 rounded-l-md rounded-r-none border border-input border-r-0 bg-background pl-2 pr-1 text-sm focus:outline-none"
     value={countryCode}
     onChange={(e) => setCountryCode(e.target.value)}
   >
     {COUNTRY_CODES.map((c) => (
       <option key={c.dial} value={c.dial}>
-        {c.dial} {c.label}
+        {c.dial} {c.short}
       </option>
     ))}
   </select>
@@ -205,7 +205,7 @@ export default function RegisterPage() {
     maxLength={10}
     placeholder="9876543210"
     required
-    className="rounded-l-none"
+    className="min-w-0 flex-1 rounded-l-none"
     value={formData.mobile}
     onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })}
   />

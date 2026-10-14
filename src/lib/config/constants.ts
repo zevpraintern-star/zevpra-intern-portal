@@ -16,18 +16,18 @@ export const POLICY_VERSIONS = {
  * from. Each entry pairs the dial code with the country name stored on the profile.
  */
 export const COUNTRY_CODES = [
-  { dial: "+91", label: "India" },
-  { dial: "+1", label: "United States / Canada" },
-  { dial: "+44", label: "United Kingdom" },
-  { dial: "+61", label: "Australia" },
-  { dial: "+65", label: "Singapore" },
-  { dial: "+971", label: "United Arab Emirates" },
-  { dial: "+49", label: "Germany" },
-  { dial: "+977", label: "Nepal" },
-  { dial: "+94", label: "Sri Lanka" },
-  { dial: "+880", label: "Bangladesh" },
-  { dial: "+60", label: "Malaysia" },
-  { dial: "+27", label: "South Africa" },
+  { dial: "+91", label: "India", short: "IN" },
+  { dial: "+1", label: "United States / Canada", short: "US/CA" },
+  { dial: "+44", label: "United Kingdom", short: "UK" },
+  { dial: "+61", label: "Australia", short: "AU" },
+  { dial: "+65", label: "Singapore", short: "SG" },
+  { dial: "+971", label: "United Arab Emirates", short: "AE" },
+  { dial: "+49", label: "Germany", short: "DE" },
+  { dial: "+977", label: "Nepal", short: "NP" },
+  { dial: "+94", label: "Sri Lanka", short: "LK" },
+  { dial: "+880", label: "Bangladesh", short: "BD" },
+  { dial: "+60", label: "Malaysia", short: "MY" },
+  { dial: "+27", label: "South Africa", short: "ZA" },
 ] as const;
 
 export const COOKIE_NAMES = {
