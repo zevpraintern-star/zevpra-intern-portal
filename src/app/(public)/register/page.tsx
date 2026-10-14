@@ -91,7 +91,13 @@ export default function RegisterPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message || "Registration failed.");
+      if (!data.success) {
+        // Surface the specific field errors (e.g. "Enter a valid 10 digit Indian mobile number.")
+        // instead of the generic "Please check your input." envelope message.
+        const details = data.error?.details as Array<{ field: string; message: string }> | undefined;
+        const specific = details?.length ? details.map((d) => d.message).join(" ") : null;
+        throw new Error(specific || data.error?.message || "Registration failed.");
+      }
       router.push("/student/dashboard");
       router.refresh();
     } catch (err: any) {
