@@ -1,4 +1,5 @@
 import { getEnv } from "../config/env";
+import { isEssentialEmailTemplate } from "../config/constants";
 import { getPrisma } from "../db/prisma";
 import { logger } from "../logger";
 import {
@@ -33,9 +34,29 @@ export interface SendEmailInput {
 export interface SendEmailResult {
   delivered: boolean;
   queued: boolean;
+  /** True when the message was suppressed by essential-only mode (no quota used). */
+  skipped?: boolean;
   logId?: string;
   providerMessageId?: string;
   error?: string;
+}
+
+/**
+ * Reads the `email_essential_only` app setting (default true). Kept local to the
+ * email service so this module has no compile-time dependency on the settings
+ * service (which imports Prisma and is used widely).
+ */
+async function isEssentialOnlyEnabled(): Promise<boolean> {
+  try {
+    const row = await getPrisma().appSetting.findUnique({
+      where: { key: "email_essential_only" },
+      select: { valueJson: true },
+    });
+    return row ? Boolean(row.valueJson) : true;
+  } catch {
+    // Fail open: if the setting cannot be read, do not silently drop security emails.
+    return false;
+  }
 }
 
 interface EmailProvider {
@@ -193,6 +214,18 @@ async function prepareMessage(input: SendEmailInput): Promise<PreparedMessage> {
 
 async function dispatch(input: SendEmailInput): Promise<SendEmailResult> {
   const env = getEnv();
+
+  // Essential-only gate (Task 2): when the `email_essential_only` setting is on
+  // (default true), only security- and outcome-critical templates are emailed; every
+  // other event stays an in-app notification only, so operational noise never spends
+  // the Brevo free-tier daily quota. Authentication codes (otp_code) always pass.
+  if (!isEssentialEmailTemplate(input.templateKey)) {
+    const essentialOnly = await isEssentialOnlyEnabled();
+    if (essentialOnly) {
+      logger.info("[email] skipped (essential-only mode)", { templateKey: input.templateKey });
+      return { delivered: false, queued: false, skipped: true };
+    }
+  }
   const prisma = getPrisma();
   let logId: string | undefined;
 

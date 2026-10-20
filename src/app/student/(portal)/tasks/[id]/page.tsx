@@ -2,7 +2,6 @@ import { Flash } from "@/components/dashboard/flash";
 import { notFound } from "next/navigation";
 
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
-import { FileField } from "@/components/forms/file-field";
 import { TextArea, TextField } from "@/components/forms/fields";
 import { DefinitionList, PageHeader } from "@/components/dashboard/primitives";
 import { StatusBadge } from "@/components/dashboard/status-badge";
@@ -65,7 +64,6 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
               {(type === "LIVE_URL" || type === "MIXED") ? <TextField label="Live URL" name="liveUrl" placeholder="https://" /> : null}
               {(type === "TEXT" || type === "MIXED") ? <TextArea label="Your answer" name="textAnswer" rows={6} /> : null}
               <TextArea label="What did you do? (explanation)" name="explanation" rows={3} hint="Min 10 characters. Mention what you learned or struggled with." />
-              {(type === "FILE" || type === "MIXED") ? <FileField label="Files" name="fileIds" purpose="TASK_SUBMISSION" multiple hint="PNG, JPG, WEBP or PDF" /> : null}
               <SubmitButton pendingLabel="Submitting…">Submit for review</SubmitButton>
             </ActionForm>
           )}

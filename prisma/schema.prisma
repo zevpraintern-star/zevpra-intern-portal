@@ -526,8 +526,6 @@ model FileAsset {
 
   owner                  User?                 @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   studentResumeProfile   StudentProfile?       @relation("StudentResumeFile")
-  taskSubmissionFiles    TaskSubmissionFile[]
-  projectSubmissionFiles ProjectSubmissionFile[]
   paymentScreenshots     PaymentScreenshot[]
   certificatePdf         Certificate?          @relation("CertificatePdfFile")
   certificateTemplates   CertificateTemplate[] @relation("CertificateTemplateFile")
@@ -817,27 +815,12 @@ model TaskSubmission {
   task       Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
   student    User                @relation("TaskSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
   reviewedBy User?               @relation("TaskSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  files      TaskSubmissionFile[]
 
   @@unique([taskId, studentId, attemptNumber])
   @@index([studentId, status])
   @@index([taskId, status])
   @@index([submittedAt])
   @@map("task_submissions")
-}
-
-model TaskSubmissionFile {
-  taskSubmissionId String   @map("task_submission_id") @db.Uuid
-  fileId           String   @map("file_id") @db.Uuid
-  sortOrder        Int      @default(0) @map("sort_order")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  taskSubmission TaskSubmission @relation(fields: [taskSubmissionId], references: [id], onDelete: Cascade)
-  file           FileAsset      @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
-  @@id([taskSubmissionId, fileId])
-  @@index([fileId])
-  @@map("task_submission_files")
 }
 
 // ---------------------------------------------------------------------------
@@ -857,6 +840,7 @@ model Project {
   requiresGithubLink Boolean            @default(true) @map("requires_github_link")
   requiresLiveUrl    Boolean            @default(false) @map("requires_live_url")
   isFinalProject     Boolean            @default(false) @map("is_final_project")
+  difficulty         DifficultyLevel    @default(BEGINNER) @map("difficulty")
   deadline           DateTime?          @db.Timestamptz(3)
   maxScore           Int                @default(100) @map("max_score")
   sortOrder          Int                @default(0) @map("sort_order")
@@ -899,7 +883,6 @@ model ProjectSubmission {
   project    Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   student    User                  @relation("ProjectSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
   reviewedBy User?                 @relation("ProjectSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  files      ProjectSubmissionFile[]
 
   @@unique([projectId, studentId])
   @@index([studentId, status])
@@ -908,19 +891,6 @@ model ProjectSubmission {
   @@map("project_submissions")
 }
 
-model ProjectSubmissionFile {
-  projectSubmissionId String   @map("project_submission_id") @db.Uuid
-  fileId              String   @map("file_id") @db.Uuid
-  sortOrder           Int      @default(0) @map("sort_order")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  projectSubmission ProjectSubmission @relation(fields: [projectSubmissionId], references: [id], onDelete: Cascade)
-  file              FileAsset         @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
-  @@id([projectSubmissionId, fileId])
-  @@index([fileId])
-  @@map("project_submission_files")
-}
 
 /// Final hand-in required before a student can become certificate eligible.
 /// The GitHub repository link is mandatory here, and admin approval of this record
@@ -1077,6 +1047,7 @@ model Certificate {
   verificationUrl     String            @map("verification_url") @db.VarChar(500)
   studentId           String            @map("student_id") @db.Uuid
   programId           String            @map("program_id") @db.Uuid
+  projectDifficulty DifficultyLevel    @map("project_difficulty")
   applicationId       String?           @map("application_id") @db.Uuid
   paymentRequestId    String?           @unique @map("payment_request_id") @db.Uuid
   templateId          String?           @map("template_id") @db.Uuid
@@ -1113,6 +1084,7 @@ model Certificate {
 model CertificateTemplate {
   id              String   @id @default(uuid(7)) @db.Uuid
   name            String   @db.VarChar(120)
+  templateKey String?  @map("template_key") @db.VarChar(60)
   version         Int      @default(1)
   isActive        Boolean  @default(false) @map("is_active")
   /// Layout tokens, colours and disclaimer text. Never contains legal or

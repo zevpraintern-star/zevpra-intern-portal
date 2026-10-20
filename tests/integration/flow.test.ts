@@ -83,7 +83,7 @@ d("internship flow (real database)", () => {
   it("IDOR: another student cannot read or submit Alice's task", async () => {
     const { getStudentTask, submitTask } = await import("@/server/services/tasks");
     await expect(getStudentTask(bob.id, taskA)).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(submitTask(bob.id, { taskId: taskA, githubUrl: "https://github.com/bob/x", fileIds: [] }, {})).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(submitTask(bob.id, { taskId: taskA, githubUrl: "https://github.com/bob/x" }, {})).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("projects stay locked until required tasks are approved (server-side gate)", async () => {
@@ -94,17 +94,17 @@ d("internship flow (real database)", () => {
   it("validates submissions, enforces attempts, and reviews update progress", async () => {
     const { submitTask, reviewTaskSubmission } = await import("@/server/services/tasks");
     const { computeProgress } = await import("@/server/services/progress");
-    await expect(submitTask(alice.id, { taskId: taskA, fileIds: [] }, {})).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(submitTask(alice.id, { taskId: taskA }, {})).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
 
-    const s1 = await submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a", fileIds: [] }, {});
-    await expect(submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a", fileIds: [] }, {})).rejects.toMatchObject({ code: "CONFLICT" });
+    const s1 = await submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a" }, {});
+    await expect(submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a" }, {})).rejects.toMatchObject({ code: "CONFLICT" });
     await reviewTaskSubmission({ userId: adminId }, { submissionId: s1.id, decision: "CHANGES_REQUESTED", feedback: "Please add a README" });
     await expect(reviewTaskSubmission({ userId: adminId }, { submissionId: s1.id, decision: "APPROVED", feedback: "double review" })).rejects.toMatchObject({ code: "CONFLICT" });
 
-    const s2 = await submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a", fileIds: [] }, {});
+    const s2 = await submitTask(alice.id, { taskId: taskA, githubUrl: "https://github.com/alice/task-a" }, {});
     expect(s2.attemptNumber).toBe(2);
     await reviewTaskSubmission({ userId: adminId }, { submissionId: s2.id, decision: "APPROVED", feedback: "Great work" });
-    const b = await submitTask(alice.id, { taskId: taskB, textAnswer: "my answer", fileIds: [] }, {});
+    const b = await submitTask(alice.id, { taskId: taskB, textAnswer: "my answer" }, {});
     await reviewTaskSubmission({ userId: adminId }, { submissionId: b.id, decision: "APPROVED", feedback: "Correct answer" });
 
     const progress = await computeProgress(aliceApp);
@@ -115,9 +115,9 @@ d("internship flow (real database)", () => {
   it("project: select, lock after submission, reject duplicate repo, verify -> eligible", async () => {
     const { selectProject, submitProject, reviewProjectSubmission } = await import("@/server/services/projects");
     const { getPaymentView } = await import("@/server/services/payments");
-    await expect(submitProject(alice.id, aliceApp, { projectId: projectA, githubUrl: "https://github.com/alice/final", fileIds: [] }, {})).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(submitProject(alice.id, aliceApp, { projectId: projectA, githubUrl: "https://github.com/alice/final", liveUrl: "https://alice-demo.vercel.app" }, {})).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await selectProject(alice.id, { applicationId: aliceApp, projectId: projectA }, {});
-    const sub = await submitProject(alice.id, aliceApp, { projectId: projectA, githubUrl: "https://github.com/alice/final", fileIds: [] }, {});
+    const sub = await submitProject(alice.id, aliceApp, { projectId: projectA, githubUrl: "https://github.com/alice/final", liveUrl: "https://alice-demo.vercel.app" }, {});
     await expect(selectProject(alice.id, { applicationId: aliceApp, projectId: projectB }, {})).rejects.toMatchObject({ code: "CONFLICT" });
 
     expect((await getPaymentView(alice.id, aliceApp)).eligible).toBe(false); // not eligible before verification

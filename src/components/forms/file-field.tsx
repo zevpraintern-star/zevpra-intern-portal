@@ -1,5 +1,6 @@
 "use client";
 
+import { compressImageFile } from "@/lib/client/compress-image";
 import { FileUp, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -30,7 +31,11 @@ export function FileField({
       const added: Uploaded[] = [];
       for (const file of Array.from(list)) {
         const body = new FormData();
-        body.set("file", file);
+        const compressed = await compressImageFile(file, {
+          maxDimension: 1280,
+          maxSizeBytes: 150 * 1024,
+        });
+        body.set("file", compressed.file);
         body.set("purpose", purpose);
         const response = await fetch("/api/uploads", { method: "POST", body });
         const json = await response.json();

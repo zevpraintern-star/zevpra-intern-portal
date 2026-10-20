@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ForbiddenError, UnauthenticatedError } from "@/lib/api/errors";
@@ -10,23 +9,23 @@ export type StaffRole = "MENTOR" | "ADMIN" | "SUPER_ADMIN";
 const STAFF_ROLES: readonly string[] = ["MENTOR", "ADMIN", "SUPER_ADMIN"];
 
 /**
- * Permission catalogue for a set of roles. The matrix only changes when an admin's role
- * is changed - and that action revokes every one of their sessions and invalidates this
- * cache through the "role-permissions" tag - so the lookup is cached for two minutes
- * instead of running a role-permission query on every page render (one more database
- * round trip per request).
+ * Permission catalogue for a set of roles. Queried on each request (a staff member's
+ * permissions only change when their role changes, which revokes their session and
+ * forces a re-login, so the result is fresh for the lifetime of the session).
+ *
+ * Note: this is intentionally NOT wrapped in `unstable_cache`. `unstable_cache` keys
+ * on its static `keyParts` array only — the function arguments are not part of the
+ * key — so caching role permissions across requests would return one role set's
+ * permissions to a different user with different roles, hiding or exposing menu items
+ * incorrectly (e.g. the Internships menu).
  */
-const cachedRolePermissions = unstable_cache(
-  async (roleKeys: string[]) => {
-    const rows = await getPrisma().rolePermission.findMany({
-      where: { role: { key: { in: roleKeys as never[] } } },
-      select: { permission: { select: { key: true } } },
-    });
-    return rows.map((row) => row.permission.key);
-  },
-  ["role-permissions"],
-  { revalidate: 120, tags: ["role-permissions"] },
-);
+async function cachedRolePermissions(roleKeys: string[]): Promise<string[]> {
+  const rows = await getPrisma().rolePermission.findMany({
+    where: { role: { key: { in: roleKeys as never[] } } },
+    select: { permission: { select: { key: true } } },
+  });
+  return rows.map((row) => row.permission.key);
+}
 
 export interface StudentContext {
   userId: string;

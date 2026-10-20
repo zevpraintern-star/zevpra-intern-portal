@@ -1,8 +1,18 @@
 /** Security tests against a real database and Redis.  RUN_DB_TESTS=1 DATABASE_URL=... npx vitest run tests/integration */
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { getPrisma } from "@/lib/db/prisma";
+
+// Test-only: `loadStaffContext` (src/lib/auth/guards.ts) wraps the role-permission
+// lookup in Next's `unstable_cache`, which throws "Invariant: incrementalCache
+// missing" outside a Next.js request. Pass the callback through uncached so every
+// call hits the live database role matrix — which is what these RBAC tests assert.
+vi.mock("next/cache", () => ({
+  unstable_cache: <T,>(cb: T) => cb,
+  revalidateTag: () => undefined,
+  revalidatePath: () => undefined,
+}));
 
 const d = describe.skipIf(process.env.RUN_DB_TESTS !== "1");
 const tag = randomUUID().slice(0, 8);

@@ -40,6 +40,7 @@ Emails, certificate PDFs, GitHub repository checks and file scans run as jobs. O
 
 - **Worker process:** `npm run worker` (recommended). Safe to run several copies.
 - **Cron:** `curl -X POST -H "Authorization: Bearer $JOB_RUNNER_SECRET" https://your-host/api/internal/jobs` every minute.
+- **Retention (daily):** run `npm run retention` (or call the same internal endpoint) on a daily schedule, e.g. `0 0 * * *`. It removes email logs after 30 days, notifications 90 days, sessions and OTP 7 and 1 days, background jobs 7 days and security events 180 days. `audit_logs` are intentionally skipped as an immutable security trail.
 
 The app also kicks the queue after each request that enqueues work. Failed jobs retry with exponential backoff (30s, 2m, 8m, up to 1h) and show up under *Security -> failed jobs* once they exhaust their attempts. Jobs stuck "running" after a crash are re-queued automatically.
 

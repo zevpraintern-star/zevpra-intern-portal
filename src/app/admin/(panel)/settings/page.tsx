@@ -1,12 +1,12 @@
 import Image from "next/image";
 
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
-import { CheckField, TextArea, TextField } from "@/components/forms/fields";
+import { CheckField, SelectField, TextArea, TextField } from "@/components/forms/fields";
 import { FileField } from "@/components/forms/file-field";
 import { PageHeader } from "@/components/dashboard/primitives";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireStaffPage } from "@/lib/auth/guards";
-import { getSetting, getPaymentSettings, isAutoApproveEnabled } from "@/server/services/settings";
+import { getSetting, getPaymentSettings, isAutoApproveEnabled, isHardTierEnabled } from "@/server/services/settings";
 import { savePaymentSettingsAction } from "@/app/admin/actions";
 
 export default async function SettingsAdmin() {
@@ -27,7 +27,10 @@ export default async function SettingsAdmin() {
             <FileField label="Upload a new QR image" name="upiQrFileId" purpose="PAYMENT_QR" accept="image/png,image/jpeg,image/webp" hint="Stored privately; shown only to certificate-eligible students." /></div>
           <TextArea label="Extra payment instructions (optional)" name="instructions" defaultValue={pay.instructions} rows={3} />
           <TextArea label="Certificate disclaimer (printed on every certificate)" name="certificateDisclaimer" defaultValue={disclaimer} rows={3} hint="Do not claim government, UGC, AICTE or university approval unless you hold it." />
-          <CheckField name="autoApprove" label="Auto-approve applications" hint="Off by default: an administrator approves each student before they receive tasks." defaultChecked={auto} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CheckField name="autoApprove" label="Auto-approve applications" hint="Off by default: an administrator approves each student before they receive tasks." defaultChecked={auto} />
+            <CheckField name="hardTier" label="Enable hard-tier certificates and hard-tier review checklist" hint="When off, the Hard tier is disabled for projects, templates and the reviewer checklist." />
+          </div>
           <SubmitButton>Save settings</SubmitButton>
         </ActionForm></CardContent></Card>
     </>

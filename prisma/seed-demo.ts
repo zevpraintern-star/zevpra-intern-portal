@@ -48,8 +48,7 @@ async function main() {
   for (const [index, [title, description, requirements]] of projects.entries()) {
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     await prisma.project.upsert({
-      where: { programId_slug: { programId: program.id, slug } }, update: {},
-      create: { programId: program.id, slug, title, description, requirements: [...requirements], skills: ["Python"], status: "PUBLISHED", publishedAt: new Date(), sortOrder: index + 1 },
+      where: { programId_slug: { programId: program.id, slug } }, update: {}, create: { programId: program.id, slug, title, description, requirements: [...requirements], skills: ["Python"], status: "PUBLISHED", publishedAt: new Date(), sortOrder: index + 1, difficulty: "INTERMEDIATE" },
     });
   }
   console.log("[seed-demo] done:", program.title);

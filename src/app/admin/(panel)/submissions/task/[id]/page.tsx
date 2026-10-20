@@ -16,7 +16,7 @@ export default async function ReviewTask({ params }: { params: Promise<{ id: str
   await requireStaffPage("tasks.review");
   const { id } = await params;
   if (!uuidSchema.safeParse(id).success) notFound();
-  const s = await getPrisma().taskSubmission.findUnique({ where: { id }, include: { task: true, student: { select: { name: true, email: true } }, files: { include: { file: { select: { id: true, originalName: true } } } } } });
+  const s = await getPrisma().taskSubmission.findUnique({ where: { id }, include: { task: true, student: { select: { name: true, email: true } } } });
   if (!s) notFound();
   const open = s.status === "SUBMITTED" || s.status === "UNDER_REVIEW";
   return (
@@ -27,7 +27,6 @@ export default async function ReviewTask({ params }: { params: Promise<{ id: str
           <DefinitionList items={[["Submitted", formatDateTime(s.submittedAt)], ["GitHub", s.githubUrl ? <a className="break-all text-primary hover:underline" href={s.githubUrl} target="_blank" rel="noopener noreferrer nofollow">{s.githubUrl}</a> : "-"], ["Live URL", s.liveUrl ?? "-"], ["Hours spent", s.hoursSpent ?? "-"]]} />
           {s.explanation ? <div><p className="text-xs text-muted-foreground">Explanation</p><p className="whitespace-pre-wrap">{s.explanation}</p></div> : null}
           {s.textAnswer ? <div><p className="text-xs text-muted-foreground">Answer</p><p className="whitespace-pre-wrap">{s.textAnswer}</p></div> : null}
-          {s.files.length ? <ul>{s.files.map((f) => <li key={f.fileId}><a className="text-primary hover:underline" href={`/api/files/${f.file.id}`} target="_blank" rel="noopener noreferrer">{f.file.originalName}</a></li>)}</ul> : null}
           <details className="rounded-lg bg-muted p-3"><summary className="cursor-pointer">Task instructions</summary><p className="mt-2 whitespace-pre-wrap">{s.task.description}{s.task.instructions ? `\n\n${s.task.instructions}` : ""}</p></details>
         </CardContent></Card>
         <Card className="h-fit"><CardHeader><CardTitle>Review</CardTitle></CardHeader><CardContent>

@@ -56,6 +56,58 @@ export const httpsUrlSchema = z
     }
   }, "Enter a valid https:// URL.");
 
+/** Live URL rules: https, no userinfo, no ports, no IP literals, no loopback or
+  * private hostnames.
+  *
+  * The client never fetches the URL (spec section 17). Validation is therefore
+  * structural only and must never be treated as a reachability or content check.
+  */
+const isIpv4Address = (value: string): boolean =>
+  /^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$/.test(
+    value,
+  );
+
+const isIpv6Address = (value: string): boolean =>
+  /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::1|::|)$/.test(value);
+
+/** Returns true for a hostname that can safely be rendered as a public link. */
+export function isPublicHostname(hostname: string): boolean {
+  if (!hostname || hostname.length > 253) return false;
+  if (hostname.includes(":")) return false; // port
+  if (hostname === "localhost") return false;
+  if (hostname.endsWith(".localhost")) return false;
+  if (hostname.endsWith(".internal") || hostname.endsWith(".local")) return false;
+  if (hostname.endsWith(".home") || hostname.endsWith(".lan")) return false;
+  if (/^10\./.test(hostname)) return false;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return false;
+  if (/^192\.168\./.test(hostname)) return false;
+  if (/^fd[0-9a-f]{2}:/i.test(hostname)) return false; // link-local IPv6
+  if (/^169\.254\./.test(hostname)) return false; // link-local IPv4
+  if (isIpv4Address(hostname) || isIpv6Address(hostname)) return false; // any IP literal
+  // A single-label hostname is reserved for private names; public hosts have a
+  // registrable second label. This also blocks "http://host".
+  if (!hostname.includes(".")) return false;
+  return true;
+}
+
+export const liveUrlSchema = z
+  .string()
+  .trim()
+  .max(500, "URL is too long.")
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:") return false;
+      if (url.username !== "" || url.password !== "") return false; // user:pass@host
+      if (url.port !== "") return false; // ports
+      return isPublicHostname(url.hostname);
+    } catch {
+      return false;
+    }
+  }, "Enter a valid public https:// URL, e.g. https://example.com.")
+  .transform((value) => value.replace(/\/+$/, ""));
+
+
 /**
  * GitHub repository URL. The final project hand-in and every project submission
  * require this, so the format is validated strictly: exactly host + owner + repo.
@@ -90,6 +142,32 @@ export const linkedinUrlSchema = z
   }, "Enter a valid LinkedIn profile URL.");
 
 export const uuidSchema = z.string().uuid("Enter a valid identifier.");
+
+/**
+ * Generic submission link (task hand-ins). Task submissions are link-only, so the
+ * student supplies a URL instead of uploading a file.
+ *
+ * The rules mirror `liveUrlSchema` (https only, no userinfo, no ports, no IP
+ * literals, no private hostnames) so a stored task link can never be used as an
+ * SSRF or XSS vector. Any public host is accepted - a task link may point at a
+ * GitHub repo, a deployed demo, a document or a write-up.
+ */
+export const taskLinkSchema = z
+  .string()
+  .trim()
+  .max(500, "URL is too long.")
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:") return false;
+      if (url.username !== "" || url.password !== "") return false; // user:pass@host
+      if (url.port !== "") return false; // ports
+      return isPublicHostname(url.hostname);
+    } catch {
+      return false;
+    }
+  }, "Enter a valid public https:// link to your work.")
+  .transform((value) => value.replace(/\/+$/, ""));
 
 export const slugSchema = z
   .string()

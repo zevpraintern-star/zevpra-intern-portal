@@ -1,5 +1,4 @@
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
-import { FileField } from "@/components/forms/file-field";
 import { SelectField, TextField } from "@/components/forms/fields";
 import { PageHeader } from "@/components/dashboard/primitives";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +29,7 @@ export default async function ProfilePage() {
           <TextField label="Country" name="country" defaultValue={profile.country} />
           <TextField label="GitHub profile" name="githubUrl" defaultValue={profile.githubUrl ?? ""} placeholder="https://github.com/username" />
           <TextField label="LinkedIn profile" name="linkedinUrl" defaultValue={profile.linkedinUrl ?? ""} placeholder="https://www.linkedin.com/in/username" />
-          <div className="sm:col-span-2"><FileField label="Resume (PDF)" name="resumeFileId" purpose="RESUME" accept="application/pdf" hint={profile.resumeFile ? `Current: ${profile.resumeFile.originalName}` : "Optional"} /></div>
+          <div className="sm:col-span-2">{profile.resumeFile ? <p className="text-sm text-muted-foreground">Resume on file: <span className="font-medium text-foreground">{profile.resumeFile.originalName}</span></p> : <p className="text-sm text-muted-foreground">No resume on file.</p>}</div>
           <div className="sm:col-span-2"><SubmitButton pendingLabel="Saving…">Save changes</SubmitButton></div>
         </ActionForm>
       </CardContent></Card>

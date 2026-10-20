@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { consumeRateLimit, rateLimits } from "@/lib/redis/rate-limit";
 import { randomCode } from "@/lib/security/crypto";
 import { CERTIFICATE } from "@/lib/config/constants";
+import { selectCertificateTemplate } from "@/lib/difficulty";
 import { paymentProofSchema, paymentReviewSchema } from "@/lib/validation/payment";
 import { audit, securityEvent, type Actor } from "@/server/services/audit";
 import { getOwnApplication } from "@/server/services/applications";
@@ -121,7 +122,7 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
     where: { id: data.paymentRequestId },
     include: {
       student: { select: { id: true, email: true, name: true, studentProfile: { select: { fullName: true, college: true } } } },
-      program: { select: { id: true, title: true, durationLabel: true, domain: { select: { name: true } } } },
+      program: { select: { id: true, title: true, durationLabel: true, difficulty: true, domain: { select: { name: true } } } },
       application: { select: { id: true, completedAt: true } },
     },
   });
@@ -151,7 +152,7 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
     });
     if (moved.count === 0) throw new ConflictError("This payment was already reviewed.");
 
-    const template = await tx.certificateTemplate.findFirst({ where: { isActive: true }, orderBy: { version: "desc" }, select: { id: true } });
+    const template = selectCertificateTemplate(await tx.certificateTemplate.findMany(), payment.program.difficulty);
     const verificationId = randomCode(CERTIFICATE.verificationIdLength);
     const row = await tx.certificate.create({
       data: {
@@ -162,6 +163,7 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
         snapshotStudentName: profile?.fullName ?? payment.student.name ?? "Student",
         snapshotProgramTitle: payment.program.title, snapshotDomainName: payment.program.domain.name,
         snapshotDuration: payment.program.durationLabel, snapshotCollege: profile?.college,
+        projectDifficulty: payment.program.difficulty,
         completionDate: payment.application.completedAt,
       },
     });

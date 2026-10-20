@@ -121,6 +121,7 @@ export const envSchema = z
     ),
     EMAIL_REPLY_TO: optionalString,
     BREVO_API_KEY: optionalString,
+    BREVO_DAILY_LIMIT: positiveInt(300),
 
     // Storage ----------------------------------------------------------------
     STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
@@ -133,6 +134,7 @@ export const envSchema = z
     STORAGE_FORCE_PATH_STYLE: booleanish(true),
     SIGNED_URL_TTL_SECONDS: positiveInt(300),
     MAX_UPLOAD_SIZE_MB: positiveInt(5),
+    MAX_PAYMENT_SCREENSHOT_KB: positiveInt(300),
 
     // Payments (manual UPI) ---------------------------------------------------
     UPI_ID: optionalString,

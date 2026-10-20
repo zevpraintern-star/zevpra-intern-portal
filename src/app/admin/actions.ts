@@ -18,7 +18,7 @@ import { assignTaskToEnrolled, decideApplication } from "@/server/services/appli
 import { revokeCertificate } from "@/server/services/certificates";
 import { reviewPayment } from "@/server/services/payments";
 import { reviewProjectSubmission } from "@/server/services/projects";
-import { clearSettingsCache, setSetting } from "@/server/services/settings";
+import { clearSettingsCache, isHardTierEnabled, setSetting } from "@/server/services/settings";
 import { reviewTaskSubmission } from "@/server/services/tasks";
 
 async function ctx(permission: string) {
@@ -112,6 +112,8 @@ export async function saveTaskAction(_: ActionState, form: FormData): Promise<Ac
       status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
     }).parse({ programId: str(form, "programId"), title: str(form, "title"), description: str(form, "description"), difficulty: str(form, "difficulty"), submissionType: str(form, "submissionType"), maxAttempts: str(form, "maxAttempts") ?? "3", points: str(form, "points") ?? "10", sortOrder: str(form, "sortOrder") ?? "0", status: str(form, "status") });
     const common = { ...data, domainId: str(form, "domainId") ?? null, instructions: str(form, "instructions"), requiresGithubLink: bool(form, "requiresGithubLink"), deadline: date(form, "deadline") };
+    const program = await getPrisma().internshipProgram.findUnique({ where: { id: data.programId }, select: { id: true, status: true } });
+    if (!program) throw new NotFoundError("The selected internship does not exist.");
     let taskId = id;
     if (id) {
       const before = await getPrisma().task.findUnique({ where: { id }, select: { status: true } });
@@ -137,7 +139,11 @@ export async function saveProjectAction(_: ActionState, form: FormData): Promise
     const data = z.object({
       programId: z.string().uuid(), title: z.string().trim().min(3).max(200), description: z.string().trim().min(10).max(8000),
       maxScore: z.coerce.number().int().min(1).max(1000), sortOrder: z.coerce.number().int().min(0).max(10000), status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
-    }).parse({ programId: str(form, "programId"), title: str(form, "title"), description: str(form, "description"), maxScore: str(form, "maxScore") ?? "100", sortOrder: str(form, "sortOrder") ?? "0", status: str(form, "status") });
+      difficulty: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]),
+    }).parse({ programId: str(form, "programId"), title: str(form, "title"), description: str(form, "description"), maxScore: str(form, "maxScore") ?? "100", sortOrder: str(form, "sortOrder") ?? "0", status: str(form, "status"), difficulty: str(form, "difficulty") ?? "BEGINNER" });
+    if (data.difficulty === "ADVANCED" && !(await isHardTierEnabled())) {
+      throw new ValidationError("The Hard tier is disabled.", [{ field: "difficulty", message: "Enable hard_tier_enabled in settings to use the Hard tier." }]);
+    }
     const common = { ...data, requirements: lines(form, "requirements"), skills: lines(form, "skills"), requiresLiveUrl: bool(form, "requiresLiveUrl"), deadline: date(form, "deadline"), requiresGithubLink: true, isFinalProject: true, submissionMethod: "GITHUB_LINK" as const };
     if (id) {
       const before = await getPrisma().project.findUnique({ where: { id }, select: { status: true } });
@@ -321,6 +327,7 @@ export async function updateContactAction(_: ActionState, form: FormData): Promi
 
 // ---- Settings ------------------------------------------------------------------
 
+
 export async function savePaymentSettingsAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
     const { staff, actor } = await ctx("settings.manage");
@@ -329,25 +336,54 @@ export async function savePaymentSettingsAction(_: ActionState, form: FormData):
       upiPayeeName: str(form, "upiPayeeName"), upiQrFileId: strList(form, "upiQrFileId")[0], instructions: str(form, "instructions"),
     });
     const set = (key: string, value: string | number | boolean, type: "STRING" | "NUMBER" | "BOOLEAN") => setSetting(key, value, type, staff.userId, { category: "payment" });
+
     await set("certificate_fee", data.certificateFee, "NUMBER");
     await set("currency", data.currency, "STRING");
     await set("upi_id", data.upiId, "STRING");
     await set("upi_payee_name", data.upiPayeeName ?? "", "STRING");
     await set("payment_instructions", data.instructions ?? "", "STRING");
+
     if (data.upiQrFileId) {
       const file = await getPrisma().fileAsset.findFirst({ where: { id: data.upiQrFileId, purpose: "PAYMENT_QR", deletedAt: null }, select: { id: true } });
       if (!file) throw new ValidationError("That QR image is not available.", [{ field: "upiQrFileId", message: "Upload the QR image again." }]);
       await set("upi_qr_file_id", data.upiQrFileId, "STRING");
     }
+
     await set("application_auto_approve", bool(form, "autoApprove"), "BOOLEAN");
+
+    // Save the Hard tier setting when the form supplies a value.
+    const hardTierValue = form.get("hardTier");
+    let hardTierForAudit: boolean | undefined;
+
+    if (hardTierValue === "on" || hardTierValue === "true" || hardTierValue === "1") {
+      await set("hard_tier_enabled", "true", "STRING");
+      hardTierForAudit = true;
+    } else if (hardTierValue === "false" || hardTierValue === "0") {
+      await set("hard_tier_enabled", "false", "STRING");
+      hardTierForAudit = false;
+    }
+
     const disclaimer = str(form, "certificateDisclaimer");
     if (disclaimer) await set("certificate_disclaimer", disclaimer, "STRING");
+
     clearSettingsCache();
-    await audit(actor, "SETTING_UPDATED", "AppSetting", "payment", { fee: data.certificateFee, currency: data.currency, upiId: data.upiId, qrChanged: Boolean(data.upiQrFileId), autoApprove: bool(form, "autoApprove") });
-    revalidatePath("/admin", "layout"); revalidatePath("/student", "layout");
+
+    await audit(actor, "SETTING_UPDATED", "AppSetting", "payment", {
+      fee: data.certificateFee,
+      currency: data.currency,
+      upiId: data.upiId,
+      qrChanged: Boolean(data.upiQrFileId),
+      autoApprove: bool(form, "autoApprove"),
+      ...(hardTierForAudit !== undefined ? { hardTier: hardTierForAudit } : {}),
+    });
+
+    revalidatePath("/admin", "layout");
+    revalidatePath("/student", "layout");
+
     return "Settings saved.";
   });
 }
+
 
 // ---- Staff accounts -------------------------------------------------------------
 

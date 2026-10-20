@@ -231,6 +231,14 @@ const APP_SETTINGS: Array<{
   description?: string;
 }> = [
   {
+    key: "email_essential_only",
+    value: true,
+    valueType: "BOOLEAN",
+    category: "email",
+    label: "Essential emails only",
+    description: "When on, only security- and outcome-critical emails are sent; every other event stays an in-app notification.",
+  },
+  {
     key: "certificate_fee",
     value: Number(process.env.CERTIFICATE_FEE ?? 50),
     valueType: "NUMBER",
@@ -238,6 +246,15 @@ const APP_SETTINGS: Array<{
     label: "Certificate fee",
     description: "Optional certificate fee in the configured currency.",
   },
+  {
+    key: "hard_tier_enabled",
+    value: false,
+    valueType: "BOOLEAN",
+    category: "certificates",
+    label: "Hard-tier enabled",
+    description: "When off, the Hard difficulty tier and hard-tier certificate template are unavailable.",
+  },
+
   {
     key: "currency",
     value: process.env.CURRENCY ?? "INR",
@@ -773,6 +790,136 @@ async function main(): Promise<void> {
       }
     }
 
+    // 3.5. Internship programs, tasks and projects for every active domain --
+    const allDomains = await prisma.domain.findMany({ where: { isActive: true } });
+
+    for (const domain of allDomains) {
+      const program = await prisma.internshipProgram.upsert({
+        where: { slug: `internship-${domain.slug}` },
+        update: {},
+        create: {
+          slug: `internship-${domain.slug}`,
+          title: `${domain.name} Internship`,
+          domainId: domain.id,
+          summary: `Build practical skills in ${domain.name} through structured tasks and a final capstone project.`,
+          description: `A comprehensive, free internship program in ${domain.name}. Complete hands-on tasks, submit your work for mentor review, build a final GitHub-hosted project, and earn a verified certificate.`,
+          durationWeeks: 8,
+          durationLabel: "8 weeks",
+          mode: "ONLINE",
+          difficulty: "BEGINNER",
+          skills: [domain.name],
+          prerequisites: [],
+          learningOutcomes: [
+            `Understand core concepts in ${domain.name}`,
+            "Complete practical, hands-on tasks",
+            "Build and submit a final capstone project",
+          ],
+          certificateRequirements: "Complete all required tasks and the final project. Certificate is optional.",
+          isFree: true,
+          status: "PUBLISHED",
+          isFeatured: false,
+          requiresFinalGithubLink: true,
+          minTasksForCompletion: 3,
+          publishedAt: new Date(),
+        },
+      });
+
+      // Tasks: 2 beginner, 1 intermediate, 1 advanced
+      const tasks = [
+        {
+          title: `Introduction to ${domain.name}`,
+          slug: `intro-${domain.slug}`,
+          difficulty: "BEGINNER",
+          submissionType: "MIXED",
+          requiresGithubLink: false,
+          description: `Get started with ${domain.name}. Learn the basics and submit your first piece of work.`,
+          instructions: `Research and write a short summary of what ${domain.name} is and why it matters. Include at least one example of real-world usage.`,
+          maxAttempts: 3,
+          points: 10,
+          sortOrder: 1,
+        },
+        {
+          title: `Fundamentals of ${domain.name}`,
+          slug: `fundamentals-${domain.slug}`,
+          difficulty: "BEGINNER",
+          submissionType: "GITHUB_LINK",
+          requiresGithubLink: true,
+          description: `Apply fundamental ${domain.name} concepts in a public GitHub repository.`,
+          instructions: `Create a public GitHub repository with starter code or documentation covering fundamental ${domain.name} topics. Submit the repository link.`,
+          maxAttempts: 3,
+          points: 15,
+          sortOrder: 2,
+        },
+        {
+          title: `Intermediate ${domain.name}`,
+          slug: `intermediate-${domain.slug}`,
+          difficulty: "INTERMEDIATE",
+          submissionType: "MIXED",
+          requiresGithubLink: true,
+          description: `Build a working deliverable in ${domain.name} and document your approach.`,
+          instructions: `Develop an intermediate-level project or solution in ${domain.name}. Host the code in a public GitHub repository and explain your design decisions.`,
+          maxAttempts: 2,
+          points: 25,
+          sortOrder: 3,
+        },
+        {
+          title: `Advanced ${domain.name} Capstone`,
+          slug: `advanced-${domain.slug}`,
+          difficulty: "ADVANCED",
+          submissionType: "GITHUB_LINK",
+          requiresGithubLink: true,
+          description: `Solve a real-world problem in ${domain.name} with a complete, documented solution.`,
+          instructions: `Build a production-quality solution for a real-world ${domain.name} problem. Include README, setup instructions, and tests where applicable. Submit the public GitHub repository link.`,
+          maxAttempts: 2,
+          points: 50,
+          sortOrder: 4,
+        },
+      ];
+
+      for (const taskData of tasks) {
+        await prisma.task.upsert({
+          where: { programId_slug: { programId: program.id, slug: taskData.slug } },
+          update: {},
+          create: {
+            ...taskData,
+            programId: program.id,
+            domainId: domain.id,
+            difficulty: taskData.difficulty as "BEGINNER" | "INTERMEDIATE" | "ADVANCED",
+            submissionType: taskData.submissionType as "MIXED" | "GITHUB_LINK" | "LIVE_URL" | "TEXT",
+            status: "PUBLISHED",
+            publishedAt: new Date(),
+          },
+        });
+      }
+
+      // Final capstone project
+      await prisma.project.upsert({
+        where: { programId_slug: { programId: program.id, slug: `final-project-${domain.slug}` } },
+        update: {},
+        create: {
+          programId: program.id,
+          slug: `final-project-${domain.slug}`,
+          title: `Final Capstone Project: ${domain.name}`,
+          description: `Build a comprehensive capstone project in ${domain.name} that demonstrates your end-to-end skills. Host it in a public GitHub repository.`,
+          requirements: [
+            "Public GitHub repository with source code",
+            "README with setup and usage instructions",
+            "Working demo or documented output",
+          ],
+          skills: [domain.name],
+          submissionMethod: "GITHUB_LINK",
+          requiresGithubLink: true,
+          requiresLiveUrl: false,
+          isFinalProject: true,
+          difficulty: "INTERMEDIATE",
+          maxScore: 100,
+          sortOrder: 1,
+          status: "PUBLISHED",
+          publishedAt: new Date(),
+        },
+      });
+    }
+
     // 4. Runtime settings ----------------------------------------------------
     for (const setting of APP_SETTINGS) {
       await prisma.appSetting.upsert({
@@ -833,27 +980,35 @@ async function main(): Promise<void> {
       });
     }
 
-    // 8. Default certificate template ----------------------------------------
-    const existingTemplate = await prisma.certificateTemplate.findFirst({
-      where: { name: "default", version: 1 },
-    });
-    if (!existingTemplate) {
+    // 8. Certificate templates -----------------------------------------------
+    // Three distinct templates: Easy (standard), Medium (premium), Hard (hard).
+    const templates = [
+      { name: "default", version: 1, isActive: true, templateKey: "standard", primaryColor: process.env.PRIMARY_COLOR ?? "#4f46e5", secondaryColor: process.env.SECONDARY_COLOR ?? "#06b6d4", headerText: "Certificate of Completion", type: "plain" },
+      { name: "premium", version: 1, isActive: false, templateKey: "premium", primaryColor: "#0f766e", secondaryColor: "#0369a1", headerText: "Premium Certificate", type: "decorated" },
+      { name: "hard", version: 1, isActive: false, templateKey: "hard", primaryColor: "#b91c1c", secondaryColor: "#7f1d1d", headerText: "Hard Tier Certificate", type: "severe" },
+    ];
+    for (const template of templates) {
+      const existingTemplate = await prisma.certificateTemplate.findFirst({ where: { name: template.name, version: template.version } });
+      if (existingTemplate) continue;
       await prisma.certificateTemplate.create({
         data: {
-          name: "default",
-          version: 1,
-          isActive: true,
+          name: template.name,
+          version: template.version,
+          isActive: template.isActive,
+          templateKey: template.templateKey,
           config: {
             orientation: "landscape",
-            primaryColor: process.env.PRIMARY_COLOR ?? "#4f46e5",
-            secondaryColor: process.env.SECONDARY_COLOR ?? "#06b6d4",
-            title: "Certificate of Completion",
+            primaryColor: template.primaryColor,
+            secondaryColor: template.secondaryColor,
+            title: template.headerText,
             showQrCode: true,
             disclaimer: DEFAULT_CERTIFICATE_DISCLAIMER,
+            type: template.type,
           },
         },
       });
     }
+
 
     // 9. Super administrator (only when explicitly configured) ---------------
     const superAdminEmail = process.env.SEED_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
@@ -887,7 +1042,7 @@ async function main(): Promise<void> {
 
     console.info("[seed] completed");
     console.info(
-      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
+      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length} tasks=${allDomains.length * 4} projects=${allDomains.length} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
     );
     console.info(`[seed] super admin: ${adminNote}`);
   } finally {

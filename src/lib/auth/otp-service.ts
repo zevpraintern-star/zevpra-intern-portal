@@ -4,8 +4,10 @@ import { sendEmailNow } from "@/lib/email/email-service";
 import { logger } from "@/lib/logger";
 import { consumeRateLimit } from "@/lib/redis/rate-limit";
 import {
+  canResendOtp,
   evaluateOtpRequest,
   generateOtp,
+  maskEmail,
   verifyOtpCode,
   type OtpPurpose,
 } from "@/lib/security/otp";
@@ -65,14 +67,74 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
     }
   }
 
-  // 2. Generate OTP
+  // 2. Reuse an existing valid, unconsumed OTP within the cooldown window so
+  //    rapid repeated requests do not send duplicate emails. Only a keyed hash
+  //    is stored, so the original code is never recovered from the database.
+  const existing = await getPrisma().otpRequest.findFirst({
+    where: {
+      email: normalisedEmail,
+      purpose: params.purpose,
+      consumedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      expiresAt: true,
+      attempts: true,
+      maxAttempts: true,
+      consumedAt: true,
+      resendCount: true,
+    },
+  });
+
+  const now = new Date();
+  if (existing) {
+    const validity = evaluateOtpRequest(
+      {
+        attempts: existing.attempts,
+        maxAttempts: existing.maxAttempts,
+        expiresAt: existing.expiresAt,
+        consumedAt: existing.consumedAt,
+        createdAt: existing.createdAt,
+      },
+      now,
+    );
+
+    if (validity.valid) {
+      const cooldownEndsAt =
+        existing.createdAt.getTime() + env.OTP_RESEND_COOLDOWN_SECONDS * 1000;
+      if (now.getTime() < cooldownEndsAt) {
+        // Reuse the code that was already sent: no new email, no new row.
+        const maskedEmail = maskEmail(normalisedEmail);
+        return { success: true, maskedEmail };
+      }
+
+      // Cooldown passed: treat as a legitimate resend and enforce the
+      // hourly resend ceiling before issuing a new code.
+      const resendAllowed = canResendOtp(
+        { createdAt: existing.createdAt, resendCount: existing.resendCount ?? 0 },
+        now,
+      );
+      if (!resendAllowed.allowed) {
+        throw new RateLimitError(
+          "Too many OTP requests for this email. Please try again later.",
+          resendAllowed.retryAfterSeconds,
+        );
+      }
+    }
+    // If existing is invalid (consumed / expired / attempts exceeded), fall
+    // through to issue a fresh OTP below.
+  }
+
+  // 3. Generate OTP (or regenerate after the cooldown window).
   const generated = generateOtp(normalisedEmail, params.purpose);
   let payloadHash: string | undefined;
   if (params.payloadToBind) {
     payloadHash = fingerprintPayload(env.SESSION_SECRET, params.payloadToBind);
   }
 
-  // 3. Find if user exists to link userId
+  // 4. Find if user exists to link userId
   const existingUser = await getPrisma().user.findUnique({
     where: { email: normalisedEmail },
     select: { id: true },
@@ -86,6 +148,7 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
       userId: existingUser?.id,
       codeHash: generated.codeHash,
       payloadHash,
+      resendCount: existing ? (existing.resendCount ?? 0) + 1 : 0,
       maxAttempts: env.OTP_MAX_ATTEMPTS,
       ipAddress: params.ipAddress?.slice(0, 45),
       userAgent: params.userAgent?.slice(0, 400),
@@ -132,8 +195,10 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
     throw new InternalError(otpDeliveryFailureMessage(env.NODE_ENV, emailResult.error));
   }
 
-  const [namePart, domainPart] = normalisedEmail.split("@");
-  const maskedEmail = `${namePart.slice(0, 2)}***@${domainPart}`;
+  // Mask consistently with the reuse path above so the same address is always
+  // displayed in the same form, and so a malformed address cannot crash the
+  // handler (maskEmail falls back to a generic label).
+  const maskedEmail = maskEmail(normalisedEmail);
 
   return { success: true, maskedEmail };
 }

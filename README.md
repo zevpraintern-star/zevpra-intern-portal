@@ -46,6 +46,7 @@ Requirements: Node 20+, PostgreSQL 14+, Redis 6+.
 | Command | What it does |
 |---|---|
 | `npm run worker` | Background job worker (emails, certificate PDFs, repo checks). Run beside the web app. |
+| `npm run retention` | Daily retention sweep (email_logs 30d, notifications 90d, sessions 7d, OTP 1d, background_jobs 7d, security_events 180d; audit_logs skipped). |
 | `npm run dev:otp -- you@mail.com [PURPOSE]` | **Dev only.** Prints the latest one-time code (the console email driver never logs codes). |
 | `npm run email:logs -- [limit]` | Read-only email delivery audit from `email_logs`. Point `DATABASE_URL` at production to see why a code never arrived. |
 | `npm test` | Unit tests. |

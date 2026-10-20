@@ -19,12 +19,12 @@ export async function assertAttachableFiles(
     where: { id: { in: unique } },
     select: {
       id: true, ownerUserId: true, purpose: true, deletedAt: true, scanStatus: true,
-      _count: { select: { taskSubmissionFiles: true, projectSubmissionFiles: true, paymentScreenshots: true } },
+      _count: { select: { paymentScreenshots: true } },
     },
   });
   if (files.length !== unique.length) throw new ForbiddenError("One of the attached files is not available.");
   for (const file of files) {
-    const attached = file._count.taskSubmissionFiles + file._count.projectSubmissionFiles + file._count.paymentScreenshots;
+    const attached = file._count.paymentScreenshots;
     if (file.ownerUserId !== userId || !purposes.includes(file.purpose) || file.deletedAt || file.scanStatus === "INFECTED" || attached > 0) {
       throw new ForbiddenError("One of the attached files is not available.");
     }

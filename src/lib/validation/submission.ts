@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { githubRepoUrlSchema, httpsUrlSchema, plainTextSchema, requiredTextSchema, uuidSchema } from "./common";
+import { githubRepoUrlSchema, liveUrlSchema, plainTextSchema, requiredTextSchema, uuidSchema } from "./common";
 
 /**
  * Task, project and final-completion submissions.
@@ -12,11 +12,10 @@ import { githubRepoUrlSchema, httpsUrlSchema, plainTextSchema, requiredTextSchem
 
 const sharedSubmissionFields = {
   liveUrl: z
-    .union([httpsUrlSchema, z.literal("")])
+    .union([liveUrlSchema, z.literal("")])
     .optional()
     .transform((value) => (value === "" ? undefined : value)),
   notes: plainTextSchema(4000).optional(),
-  fileIds: z.array(uuidSchema).max(5, "Attach at most 5 files.").default([]),
 };
 
 export const taskSubmissionSchema = z.object({
@@ -58,6 +57,8 @@ export const projectSubmissionSchema = z.object({
   /** Mandatory for project submissions. */
   githubUrl: githubRepoUrlSchema,
   ...sharedSubmissionFields,
+  /** A live demo URL is required for every project hand-in (links-only submission). */
+  liveUrl: liveUrlSchema,
 });
 
 export type ProjectSubmissionInput = z.infer<typeof projectSubmissionSchema>;

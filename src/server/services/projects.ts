@@ -7,7 +7,6 @@ import { projectSubmissionSchema, reviewDecisionSchema } from "@/lib/validation/
 import { uuidSchema } from "@/lib/validation/common";
 import { audit, securityEvent, type Actor } from "@/server/services/audit";
 import { getOwnApplication } from "@/server/services/applications";
-import { assertAttachableFiles } from "@/server/services/files";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { computeProgress, refreshProgress } from "@/server/services/progress";
 import { getPaymentSettings } from "@/server/services/settings";
@@ -22,6 +21,7 @@ export async function getProjectStage(studentId: string, applicationId: string) 
   const projects = progress.tasksComplete
     ? await getPrisma().project.findMany({
         where: { programId: application.programId, status: "PUBLISHED" },
+        select: { id: true, title: true, description: true, requirements: true, skills: true, difficulty: true },
         orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
       })
     : [];
@@ -50,7 +50,7 @@ export async function selectProject(studentId: string, input: z.infer<typeof sel
 
   const project = await getPrisma().project.findFirst({
     where: { id: data.projectId, programId: application.programId, status: "PUBLISHED" },
-    select: { id: true, title: true },
+    select: { id: true, title: true, difficulty: true },
   });
   if (!project) throw new NotFoundError("Project not found.");
 
@@ -75,7 +75,7 @@ export async function submitProject(studentId: string, applicationId: string, in
 
   const project = await getPrisma().project.findFirst({
     where: { id: data.projectId, programId: application.programId, status: "PUBLISHED" },
-    select: { id: true, title: true },
+    select: { id: true, title: true, difficulty: true },
   });
   if (!project) throw new NotFoundError("Project not found.");
 
@@ -94,16 +94,11 @@ export async function submitProject(studentId: string, applicationId: string, in
     throw new ConflictError("This repository was already submitted by another account. Submit your own work.");
   }
 
-  await assertAttachableFiles(studentId, data.fileIds, ["PROJECT_FILE", "PROJECT_SCREENSHOT"]);
-
   const submission = await getPrisma().$transaction(async (tx) => {
     const base = { githubUrl: data.githubUrl, liveUrl: data.liveUrl, notes: data.notes, status: "SUBMITTED" as const, submittedAt: new Date(), reviewedById: null, reviewedAt: null, feedback: null, score: null, repoCheckStatus: "PENDING", repoCheckedAt: null };
     const row = existing
       ? await tx.projectSubmission.update({ where: { id: existing.id }, data: base })
       : await tx.projectSubmission.create({ data: { projectId: project.id, studentId, ...base } });
-    if (data.fileIds.length > 0) {
-      await tx.projectSubmissionFile.createMany({ data: data.fileIds.map((fileId, i) => ({ projectSubmissionId: row.id, fileId, sortOrder: i })), skipDuplicates: true });
-    }
     return row;
   });
 

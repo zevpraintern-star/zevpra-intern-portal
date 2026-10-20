@@ -57,7 +57,9 @@ async function scanFile(fileId: string): Promise<void> {
 const HANDLERS: Record<string, (job: { id: string; payload: Payload }) => Promise<void>> = {
   EMAIL: async (job) => {
     const result = await processEmailJob(job.id);
-    if (!result.delivered) throw new Error(result.error ?? "email delivery failed");
+    // A message suppressed by essential-only mode is a successful no-op, not a failure,
+    // so the job must not be retried.
+    if (!result.delivered && !result.skipped) throw new Error(result.error ?? "email delivery failed");
   },
   CERTIFICATE_PDF: async (job) => generateCertificate(String(job.payload.certificateId)),
   GITHUB_REPO_CHECK: async (job) => checkRepository(String(job.payload.submissionId)),

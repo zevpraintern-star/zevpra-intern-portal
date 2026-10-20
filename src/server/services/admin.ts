@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
+import { getEnv } from "@/lib/config/env";
 import { getPrisma } from "@/lib/db/prisma";
 
 /** Aggregate counts only: the dashboard never loads individual student records. */
@@ -7,9 +8,13 @@ export async function dashboardMetrics() {
   const since30 = new Date(Date.now() - 30 * 86_400_000);
   const since7 = new Date(Date.now() - 7 * 86_400_000);
 
+  const sinceMidnight = new Date();
+  sinceMidnight.setHours(0, 0, 0, 0);
+
   const [
     totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships,
     pendingTaskSubmissions, pendingProjectReviews, eligibleNoCert, paymentsUnderReview, issuedCertificates,
+    emailsSentToday,
   ] = await Promise.all([
     prisma.studentProfile.count(),
     prisma.studentProfile.count({ where: { createdAt: { gte: since7 } } }),
@@ -22,6 +27,7 @@ export async function dashboardMetrics() {
     prisma.application.count({ where: { certificateEligibleAt: { not: null }, paymentRequests: { none: { status: "APPROVED" } } } }),
     prisma.paymentRequest.count({ where: { status: "UNDER_REVIEW" } }),
     prisma.certificate.count({ where: { status: "GENERATED" } }),
+    prisma.emailLog.count({ where: { status: "SENT", sentAt: { gte: sinceMidnight } } }),
   ]);
 
   // Parameterised raw SQL (tagged template): the date is bound, never concatenated.
@@ -44,7 +50,9 @@ export async function dashboardMetrics() {
   }
 
   return {
-    totals: { totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships, pendingTaskSubmissions, pendingProjectReviews, eligibleNoCert, paymentsUnderReview, issuedCertificates },
+    totals: { totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships, pendingTaskSubmissions, pendingProjectReviews, eligibleNoCert, paymentsUnderReview, issuedCertificates,
+    emailQuota: { sent: emailsSentToday, limit: getEnv().BREVO_DAILY_LIMIT },
+    },
     registrations: days,
     byDomain: byDomainRaw.map((r) => ({ label: names.get(r.domainId) ?? "Unknown", value: r._count._all })),
     completion: completionRaw.map((r) => ({ label: r.completionStatus, value: r._count._all })),

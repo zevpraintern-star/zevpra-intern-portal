@@ -6,7 +6,9 @@ import { PageHeader, Table, Td, Th } from "@/components/dashboard/primitives";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireStaffPage } from "@/lib/auth/guards";
+import { difficultyLabel } from "@/lib/difficulty";
 import { getPrisma } from "@/lib/db/prisma";
+import { isHardTierEnabled } from "@/server/services/settings";
 import { saveProjectAction } from "@/app/admin/actions";
 
 export default async function ProjectsAdmin({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
@@ -20,8 +22,8 @@ export default async function ProjectsAdmin({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Projects" description="Students choose one published project after finishing their tasks." />
-      <Table label="Projects"><thead><tr><Th>Project</Th><Th>Internship</Th><Th>Status</Th><Th>Submissions</Th><Th /></tr></thead><tbody>
-        {projects.map((x) => (<tr key={x.id}><Td className="font-medium">{x.title}</Td><Td>{x.program.title}</Td><Td><StatusBadge value={x.status} /></Td><Td>{x._count.submissions}</Td><Td><Link className="text-primary hover:underline" href={`?edit=${x.id}#form`}>Edit</Link></Td></tr>))}</tbody></Table>
+      <Table label="Projects"><thead><tr><Th>Project</Th><Th>Internship</Th><Th>Difficulty</Th><Th>Status</Th><Th>Submissions</Th><Th /></tr></thead><tbody>
+        {projects.map((x) => (<tr key={x.id}><Td className="font-medium">{x.title}</Td><Td>{x.program.title}</Td><Td>{difficultyLabel(x.difficulty)}</Td><Td><StatusBadge value={x.status} /></Td><Td>{x._count.submissions}</Td><Td><Link className="text-primary hover:underline" href={`?edit=${x.id}#form`}>Edit</Link></Td></tr>))}</tbody></Table>
       <Card className="mt-8" id="form"><CardHeader><CardTitle>{p ? `Edit: ${p.title}` : "New project"}</CardTitle></CardHeader><CardContent>
         <ActionForm action={saveProjectAction} className="grid gap-5 md:grid-cols-2" key={p?.id ?? "new"}>
           {p ? <input type="hidden" name="id" value={p.id} /> : null}
@@ -34,6 +36,16 @@ export default async function ProjectsAdmin({ searchParams }: { searchParams: Pr
           <TextField label="Order" name="sortOrder" type="number" min={0} defaultValue={p?.sortOrder ?? 0} />
           <SelectField label="Status" name="status" defaultValue={p?.status ?? "DRAFT"} options={["DRAFT", "PUBLISHED", "ARCHIVED"].map((v) => ({ value: v, label: v.toLowerCase() }))} />
           <CheckField name="requiresLiveUrl" label="Require a live URL" defaultChecked={p?.requiresLiveUrl} />
+          <SelectField
+            label="Difficulty"
+            name="difficulty"
+            defaultValue={p?.difficulty}
+            options={[
+              { value: "BEGINNER", label: "Easy" },
+              { value: "INTERMEDIATE", label: "Medium" },
+              ...(await isHardTierEnabled() ? [{ value: "ADVANCED", label: "Hard" }] : []),
+            ]}
+          />
           <div className="md:col-span-2"><SubmitButton>{p ? "Save changes" : "Create project"}</SubmitButton></div>
         </ActionForm></CardContent></Card>
     </>

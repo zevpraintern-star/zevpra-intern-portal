@@ -13,8 +13,11 @@ import { saveUpload, validateUpload, type FilePurpose } from "@/lib/storage/stor
 import { securityEvent } from "@/server/services/audit";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
 
-const STUDENT_PURPOSES: FilePurpose[] = ["RESUME", "PAYMENT_SCREENSHOT", "TASK_SUBMISSION", "PROJECT_FILE", "PROJECT_SCREENSHOT", "AVATAR"];
-const STAFF_PURPOSES: Partial<Record<FilePurpose, string>> = { PAYMENT_QR: "settings.manage", CERTIFICATE_TEMPLATE: "settings.manage" };
+// Task 3: submissions and profiles are links only. The ONLY student upload left is
+// the payment screenshot; staff may upload the payment QR. Every other purpose is
+// rejected here even if a valid FilePurpose enum value is supplied.
+const STUDENT_PURPOSES: FilePurpose[] = ["PAYMENT_SCREENSHOT"];
+const STAFF_PURPOSES: Partial<Record<FilePurpose, string>> = { PAYMENT_QR: "settings.manage" };
 
 export const POST = route(async (req, _ctx, meta) => {
   const env = getEnv();
@@ -48,6 +51,12 @@ export const POST = route(async (req, _ctx, meta) => {
 
   const body = Buffer.from(await file.arrayBuffer());
   const { extension } = validateUpload({ originalName: file.name, mimeType: file.type, sizeBytes: body.byteLength });
+
+  // Payment screenshots are compressed in the browser before upload; the server still
+  // enforces a hard cap so an uncompressed/forged upload can never slip through.
+  if (purpose === "PAYMENT_SCREENSHOT" && body.byteLength > env.MAX_PAYMENT_SCREENSHOT_KB * 1024) {
+    throw new PayloadTooLargeError(`Payment screenshots must be under ${env.MAX_PAYMENT_SCREENSHOT_KB} KB after compression.`);
+  }
 
   // The declared type and extension are attacker-controlled: trust only the bytes.
   const sniffed = sniffMime(body);

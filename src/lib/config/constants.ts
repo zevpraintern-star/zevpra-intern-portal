@@ -173,3 +173,29 @@ export const GITHUB = {
 export const UTR = {
   pattern: /^[A-Za-z0-9]{8,30}$/,
 } as const;
+
+/**
+ * Email categories the platform treats as essential. When the `email_essential_only`
+ * setting is on (the default), ONLY these templates are emailed; every other event is
+ * delivered as an in-app notification only. This protects the Brevo free-tier daily
+ * quota so operational noise (welcome, task assigned, submission received, ...) never
+ * spends it.
+ */
+export const ESSENTIAL_EMAIL_TEMPLATES = new Set<string>([
+  // Authentication
+  "otp_code",
+  // Application outcomes
+  "application_approved",
+  "application_rejected",
+  // Certificate journey
+  "certificate_eligible",
+  "payment_approved",
+  "payment_rejected",
+  "certificate_issued",
+  // Security
+  "security_alert",
+]);
+
+export function isEssentialEmailTemplate(templateKey: string): boolean {
+  return ESSENTIAL_EMAIL_TEMPLATES.has(templateKey);
+}

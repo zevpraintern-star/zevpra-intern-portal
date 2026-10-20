@@ -47,7 +47,7 @@ export async function submitTaskAction(_: ActionState, form: FormData): Promise<
     const { student, actor } = await context();
     await submitTask(student.userId, {
       taskId: str(form, "taskId") as string, githubUrl: str(form, "githubUrl"), liveUrl: str(form, "liveUrl"),
-      explanation: str(form, "explanation"), textAnswer: str(form, "textAnswer"), hoursSpent: num(form, "hoursSpent"), fileIds: strList(form, "fileIds"),
+      explanation: str(form, "explanation"), textAnswer: str(form, "textAnswer"), hoursSpent: num(form, "hoursSpent"),
     } as never, actor);
     revalidatePath("/student", "layout");
     redirect(`/student/tasks/${str(form, "taskId")}?flash=task_submitted`);
@@ -67,7 +67,7 @@ export async function submitProjectAction(_: ActionState, form: FormData): Promi
   return runAction(async () => {
     const { student, actor } = await context();
     await submitProject(student.userId, str(form, "applicationId") as string, {
-      projectId: str(form, "projectId") as string, githubUrl: str(form, "githubUrl") as string, liveUrl: str(form, "liveUrl"), notes: str(form, "notes"), fileIds: strList(form, "fileIds"),
+      projectId: str(form, "projectId") as string, githubUrl: str(form, "githubUrl") as string, liveUrl: str(form, "liveUrl"), notes: str(form, "notes"),
     } as never, actor);
     revalidatePath("/student", "layout");
     redirect("/student/projects?flash=project_submitted");

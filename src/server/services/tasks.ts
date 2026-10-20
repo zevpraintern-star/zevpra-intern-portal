@@ -4,9 +4,9 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/api/errors"
 import { getPrisma } from "@/lib/db/prisma";
 import { reviewDecisionSchema, taskSubmissionSchema } from "@/lib/validation/submission";
 import { audit, type Actor } from "@/server/services/audit";
-import { assertAttachableFiles } from "@/server/services/files";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { refreshProgress, taskScope } from "@/server/services/progress";
+import { enforceGithubRequirement } from "@/lib/validation/submission";
 
 const OPEN: ReadonlyArray<string> = ["SUBMITTED", "UNDER_REVIEW"];
 
@@ -39,7 +39,6 @@ export async function getStudentTask(studentId: string, taskId: string) {
   const submissions = await getPrisma().taskSubmission.findMany({
     where: { taskId, studentId },
     orderBy: { attemptNumber: "desc" },
-    include: { files: { select: { fileId: true, file: { select: { originalName: true } } } } },
   });
   return { assignment, task: assignment.task, submissions };
 }
@@ -56,19 +55,20 @@ export async function submitTask(studentId: string, input: z.infer<typeof taskSu
   if (latest?.status === "APPROVED") throw new ConflictError("This task is already approved.");
   if (submissions.length >= task.maxAttempts) throw new ValidationError("You have used all attempts for this task.");
 
-  const hasFile = data.fileIds.length > 0;
+  // Enforce task-level GitHub requirement via the shared validator.
+  enforceGithubRequirement(data, task.requiresGithubLink);
+  if (task.submissionType === "GITHUB_LINK" && !data.githubUrl) {
+    throw new ValidationError("Add your GitHub repository link.", [{ field: "githubUrl", message: "A GitHub repository link is required for this submission type." }]);
+  }
+
   const problems: Array<{ field: string; message: string }> = [];
-  if (task.requiresGithubLink && !data.githubUrl) problems.push({ field: "githubUrl", message: "A public GitHub repository link is required." });
-  if (task.submissionType === "GITHUB_LINK" && !data.githubUrl) problems.push({ field: "githubUrl", message: "Add your GitHub repository link." });
   if (task.submissionType === "LIVE_URL" && !data.liveUrl) problems.push({ field: "liveUrl", message: "Add your live URL." });
   if (task.submissionType === "TEXT" && !data.textAnswer) problems.push({ field: "textAnswer", message: "Write your answer." });
-  if (task.submissionType === "FILE" && !hasFile) problems.push({ field: "fileIds", message: "Attach at least one file." });
-  if (task.submissionType === "MIXED" && !data.githubUrl && !data.liveUrl && !data.textAnswer && !hasFile) {
+  if (task.submissionType === "FILE" && !data.githubUrl) problems.push({ field: "githubUrl", message: "Add a link to your work (e.g. GitHub repository or hosted file)." });
+  if (task.submissionType === "MIXED" && !data.githubUrl && !data.liveUrl && !data.textAnswer) {
     problems.push({ field: "explanation", message: "Provide a link, an answer or a file." });
   }
   if (problems.length > 0) throw new ValidationError("Please complete your submission.", problems);
-
-  await assertAttachableFiles(studentId, data.fileIds, ["TASK_SUBMISSION"]);
 
   let created;
   try {
@@ -78,7 +78,6 @@ export async function submitTask(studentId: string, input: z.infer<typeof taskSu
           taskId: task.id, studentId, attemptNumber: submissions.length + 1,
           githubUrl: data.githubUrl, liveUrl: data.liveUrl, explanation: data.explanation,
           textAnswer: data.textAnswer, hoursSpent: data.hoursSpent,
-          files: { create: data.fileIds.map((fileId, index) => ({ fileId, sortOrder: index })) },
         },
       });
       await tx.taskAssignment.update({ where: { id: assignment.id }, data: { status: "SUBMITTED" } });
