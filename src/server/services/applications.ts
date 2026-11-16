@@ -29,17 +29,22 @@ export const reviewApplicationSchema = z
 /** Published programs a student can still apply to. */
 export async function listOpenPrograms(studentId: string) {
   const now = new Date();
-  const [programs, mine] = await Promise.all([
-    getPrisma().internshipProgram.findMany({
-      where: { status: "PUBLISHED", OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      orderBy: [{ isFeatured: "desc" }, { title: "asc" }],
-      select: {
-        id: true, slug: true, title: true, summary: true, durationLabel: true, difficulty: true, skills: true,
-        domain: { select: { name: true } },
-      },
-    }),
+  const [profile, mine] = await Promise.all([
+    getPrisma().studentProfile.findUnique({ where: { userId: studentId }, select: { preferredDomainId: true } }),
     getPrisma().application.findMany({ where: { studentId }, select: { programId: true, status: true } }),
   ]);
+  const programs = await getPrisma().internshipProgram.findMany({
+    where: {
+      status: "PUBLISHED",
+      ...(profile?.preferredDomainId ? { domainId: profile.preferredDomainId } : {}),
+      OR: [{ endDate: null }, { endDate: { gte: now } }],
+    },
+    orderBy: [{ isFeatured: "desc" }, { title: "asc" }],
+    select: {
+      id: true, slug: true, title: true, summary: true, durationLabel: true, difficulty: true, skills: true,
+      domain: { select: { name: true } },
+    },
+  });
   const status = new Map(mine.map((a) => [a.programId, a.status]));
   return programs.map((p) => ({ ...p, applicationStatus: status.get(p.id) ?? null }));
 }
