@@ -26,7 +26,7 @@ export function Hero({ fee }: { fee: string }) {
       ref={ref}
       data-stage="hero"
       aria-labelledby="hero-heading"
-      className="relative flex min-h-[100svh] items-start pb-20 pt-14 sm:pb-24 sm:pt-16"
+      className="relative flex min-h-[100svh] items-start pb-20 pt-0 sm:pb-24 sm:pt-2"
     >
       <motion.div style={{ opacity, y }} className="container-page w-full">
         <div className="max-w-2xl">
