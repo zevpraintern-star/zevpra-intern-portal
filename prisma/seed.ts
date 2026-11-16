@@ -797,23 +797,43 @@ async function main(): Promise<void> {
       const tracks = [
         { key: "easy", label: "Easy: Foundations", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
           focus: "core concepts and guided practice", points: 10,
-          taskNames: ["Foundations and vocabulary", "Guided practical exercise", "Small independent deliverable"],
+          tasks: [
+            { title: "Create a core concepts map", description: `Explain the essential ideas and vocabulary used in ${domain.name}.`, instructions: `Create a glossary of at least eight important ${domain.name} terms. Show how at least three concepts connect, and give a practical example for each. Submit a clear concept map and short explanations in your repository README.` },
+            { title: "Complete a guided beginner exercise", description: `Follow a beginner-level ${domain.name} exercise and record each step and result.`, instructions: `Choose or design a safe beginner exercise in ${domain.name}. Document the setup, list the steps in order, record the inputs and outputs or observations, and explain what each result means. Include evidence such as screenshots, diagrams, calculations, or code as appropriate.` },
+            { title: "Solve a small domain challenge", description: `Use the foundations of ${domain.name} to solve one clearly scoped practical problem.`, instructions: `Choose one small, real-world problem that can be addressed with beginner ${domain.name} skills. State the problem and assumptions, show your solution, and explain how someone can reproduce or review the result. Include one limitation and a sensible next improvement.` },
+          ],
           project: "Foundations Portfolio" },
         { key: "easy-lab", label: "Easy: Practical Lab", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
           focus: "guided labs, essential tools, and small practical outcomes", points: 10,
-          taskNames: ["Explore the essential tools", "Complete a guided domain lab", "Present a small practical result"],
+          tasks: [
+            { title: "Compare essential tools", description: `Identify and compare tools commonly used in ${domain.name}.`, instructions: `Select three tools, methods, or resources used in ${domain.name}. For each, explain its purpose, the problem it solves, basic setup or use, and one strength and limitation. Present the comparison as a table with links to reliable documentation.` },
+            { title: "Reproduce a beginner lab", description: `Repeat a small ${domain.name} lab and keep a traceable record of the procedure.`, instructions: `Perform a beginner-friendly ${domain.name} lab or practical procedure. Record materials or software, starting conditions, numbered steps, and observations at each stage. Include enough detail that another beginner can reproduce it safely.` },
+            { title: "Present and interpret lab results", description: `Turn your ${domain.name} lab observations into a clear result and conclusion.`, instructions: `Organize the results from your lab in a chart, annotated diagram, calculation, or concise result table. Explain the main finding, whether it matched your expectation, one source of error or uncertainty, and what experiment you would try next.` },
+          ],
           project: "Practical Skills Showcase" },
         { key: "medium", label: "Medium: Applied Analysis", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
           focus: "applied techniques and independent problem solving", points: 20,
-          taskNames: ["Analyze a real use case", "Build a working prototype", "Validate and document your solution"],
+          tasks: [
+            { title: "Analyze a real use case", description: `Turn a real ${domain.name} use case into requirements and measurable acceptance criteria.`, instructions: `Select a realistic ${domain.name} scenario. Identify the user or stakeholder, problem, constraints, inputs, outputs, and at least four measurable acceptance criteria. Explain important assumptions and cite the sources or evidence behind them.` },
+            { title: "Build a working prototype", description: `Create a focused ${domain.name} prototype that addresses the selected use case.`, instructions: `Build a prototype that addresses the use case and acceptance criteria from your analysis. Include the main workflow or process, representative sample data or materials, setup instructions, and a short demo or documented output. Explain key design choices.` },
+            { title: "Validate the prototype", description: `Test the ${domain.name} prototype against its criteria and report the results.`, instructions: `Create a validation plan covering normal use, at least two edge cases, and each acceptance criterion. Run the checks, record expected versus actual results, fix or explain failures, and summarize limitations and next steps.` },
+          ],
           project: "Applied Solution" },
         { key: "medium-build", label: "Medium: Integrated Build", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
           focus: "combining domain techniques into a complete, tested deliverable", points: 20,
-          taskNames: ["Plan an integrated solution", "Build and document its core components", "Test it against clear acceptance criteria"],
+          tasks: [
+            { title: "Plan the solution architecture", description: `Design how the major parts of an integrated ${domain.name} solution will work together.`, instructions: `Define the problem and draw an architecture or process diagram for your ${domain.name} solution. Label at least three components, their inputs and outputs, how information or materials move between them, and one key risk or dependency. Explain why this design fits the requirements.` },
+            { title: "Implement and integrate components", description: `Build the core components and connect them into one ${domain.name} workflow.`, instructions: `Implement at least two components from your plan and demonstrate how they work together from input to output. Keep the repository organized, document setup and interfaces, and include a working example that a reviewer can follow.` },
+            { title: "Verify end-to-end behavior", description: `Check the integrated ${domain.name} workflow against its acceptance criteria.`, instructions: `Create a traceability table linking each requirement to a verification step and result. Test the full workflow, include at least one failure or boundary case, record evidence, and explain any remaining gaps or trade-offs.` },
+          ],
           project: "Integrated Domain Solution" },
         { key: "hard", label: "Hard: Industry Challenge", difficulty: "ADVANCED" as const, taskDifficulty: "ADVANCED" as const, weeks: 8,
           focus: "system design, tradeoffs, and a production-minded solution", points: 35,
-          taskNames: ["Scope and justify a complex problem", "Implement an end-to-end solution", "Evaluate, improve, and present results"],
+          tasks: [
+            { title: "Scope an industry problem", description: `Prepare a rigorous problem brief for a complex ${domain.name} challenge.`, instructions: `Choose a consequential ${domain.name} problem and define its stakeholders, operating context, constraints, and measurable success criteria. Compare at least two possible approaches, document assumptions and risks, and justify the approach you will pursue.` },
+            { title: "Deliver an end-to-end solution", description: `Implement a complete ${domain.name} solution with documented operational and failure paths.`, instructions: `Build the end-to-end solution from the problem brief. Include the primary workflow, input validation or safety controls, error or failure handling, and reproducible setup. Document architecture decisions and demonstrate a representative end-to-end scenario.` },
+            { title: "Benchmark and improve the solution", description: `Evaluate the ${domain.name} solution against measurable goals and recommend improvements.`, instructions: `Evaluate the solution against at least three measurable criteria relevant to ${domain.name}, such as accuracy, performance, reliability, cost, safety, or resource use. Record the method and results, analyze trade-offs and failure cases, make one evidence-based improvement, and present remaining risks.` },
+          ],
           project: "Industry Challenge Capstone" },
       ];
 
@@ -849,18 +869,36 @@ async function main(): Promise<void> {
           },
         });
 
-        for (const [index, taskName] of track.taskNames.entries()) {
+        for (const [index, taskPlan] of track.tasks.entries()) {
           const slug = `${track.key}-${domain.slug}-${index + 1}`;
+          const existingTask = await prisma.task.findUnique({
+            where: { programId_slug: { programId: program.id, slug } },
+            select: { description: true, instructions: true },
+          });
+          const isLegacyGeneratedTask = Boolean(
+            existingTask?.instructions?.startsWith(`Create a focused ${domain.name} deliverable for this `),
+          );
           await prisma.task.upsert({
             where: { programId_slug: { programId: program.id, slug } },
-            update: {},
+            update: isLegacyGeneratedTask ? {
+              title: `${track.label} ${domain.name}: ${taskPlan.title}`,
+              description: taskPlan.description,
+              instructions: taskPlan.instructions,
+              difficulty: track.taskDifficulty,
+              submissionType: "MIXED",
+              requiresGithubLink: true,
+              maxAttempts: track.key === "hard" ? 2 : 3,
+              points: track.points + index * 5,
+              sortOrder: index + 1,
+              status: "PUBLISHED",
+            } : {},
             create: {
               programId: program.id,
               domainId: domain.id,
-              title: `${track.label} ${domain.name}: ${taskName}`,
+              title: `${track.label} ${domain.name}: ${taskPlan.title}`,
               slug,
-              description: `${taskName} using concepts and tools from ${domain.name}.`,
-              instructions: `Create a focused ${domain.name} deliverable for this ${track.label.toLowerCase()}-level task. State the problem, explain your approach, show the result, and note what you would improve next. For code or design artifacts, submit a public GitHub repository with a clear README.`,
+              description: taskPlan.description,
+              instructions: taskPlan.instructions,
               difficulty: track.taskDifficulty,
               submissionType: "MIXED",
               requiresGithubLink: true,
