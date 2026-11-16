@@ -6,7 +6,6 @@ import { getPrisma } from "@/lib/db/prisma";
 import { plainTextSchema, requiredTextSchema, uuidSchema } from "@/lib/validation/common";
 import { audit, type Actor } from "@/server/services/audit";
 import { notifyAndEmail } from "@/server/services/notifications";
-import { isAutoApproveEnabled } from "@/server/services/settings";
 import { taskScope } from "@/server/services/progress";
 
 export const applySchema = z.object({
@@ -33,20 +32,25 @@ export async function listOpenPrograms(studentId: string) {
     getPrisma().studentProfile.findUnique({ where: { userId: studentId }, select: { preferredDomainId: true } }),
     getPrisma().application.findMany({ where: { studentId }, select: { programId: true, status: true } }),
   ]);
-  const programs = await getPrisma().internshipProgram.findMany({
-    where: {
-      status: "PUBLISHED",
-      ...(profile?.preferredDomainId ? { domainId: profile.preferredDomainId } : {}),
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
-    },
-    orderBy: [{ isFeatured: "desc" }, { title: "asc" }],
-    select: {
-      id: true, slug: true, title: true, summary: true, durationLabel: true, difficulty: true, skills: true,
-      domain: { select: { name: true } },
-    },
-  });
+  const programs = profile?.preferredDomainId
+    ? await getPrisma().internshipProgram.findMany({
+        where: {
+          status: "PUBLISHED",
+          domainId: profile.preferredDomainId,
+          OR: [{ endDate: null }, { endDate: { gte: now } }],
+        },
+        orderBy: [{ isFeatured: "desc" }, { title: "asc" }],
+        select: {
+          id: true, slug: true, title: true, summary: true, durationLabel: true, difficulty: true, skills: true,
+          domain: { select: { name: true } },
+        },
+      })
+    : [];
   const status = new Map(mine.map((a) => [a.programId, a.status]));
-  return programs.map((p) => ({ ...p, applicationStatus: status.get(p.id) ?? null }));
+  return {
+    programs: programs.map((p) => ({ ...p, applicationStatus: status.get(p.id) ?? null })),
+    hasPreferredDomain: Boolean(profile?.preferredDomainId),
+  };
 }
 
 export async function applyToProgram(studentId: string, input: z.infer<typeof applySchema>, actor: Actor) {
@@ -80,9 +84,8 @@ export async function applyToProgram(studentId: string, input: z.infer<typeof ap
 
   // Always create application in PENDING status - admin approval required
   // Do NOT auto-approve regardless of settings
-  
+
   return application;
-}
 }
 
 export async function withdrawApplication(studentId: string, applicationId: string): Promise<void> {
