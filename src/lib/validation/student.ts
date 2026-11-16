@@ -41,7 +41,7 @@ export const studentRegistrationSchema = z.object({
   state: requiredTextSchema(120, 2).optional(),
   city: requiredTextSchema(120, 2).optional(),
   country: requiredTextSchema(120, 2).default("India"),
-  preferredDomainId: uuidSchema.optional(),
+  preferredDomainId: uuidSchema,
   githubUrl: githubProfileUrlSchema.optional(),
   linkedinUrl: z
     .union([linkedinUrlSchema, z.literal("")])

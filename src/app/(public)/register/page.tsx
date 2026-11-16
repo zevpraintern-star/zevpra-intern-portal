@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, Mail, ShieldCheck } from "lucide-react";
@@ -21,6 +21,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState<string>("+91");
+  const [domains, setDomains] = useState<Array<{ id: string; name: string }>>([]);
+  const [domainsLoading, setDomainsLoading] = useState(true);
+  const [domainsError, setDomainsError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -30,9 +33,27 @@ export default function RegisterPage() {
     branch: "Computer Science",
     yearOfStudy: 3,
     graduationYear: 2026,
+    preferredDomainId: "",
     termsAccepted: false,
     privacyAccepted: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/domains")
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error?.message || "Could not load internship domains.");
+        if (!cancelled) setDomains(data.data);
+      })
+      .catch((err) => {
+        if (!cancelled) setDomainsError(err instanceof Error ? err.message : "Could not load internship domains.");
+      })
+      .finally(() => {
+        if (!cancelled) setDomainsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +277,24 @@ export default function RegisterPage() {
                     onChange={(e) => setFormData({ ...formData, graduationYear: Number(e.target.value) })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="preferredDomainId">Internship domain</Label>
+                <select
+                  id="preferredDomainId"
+                  required
+                  disabled={domainsLoading || domains.length === 0}
+                  value={formData.preferredDomainId}
+                  onChange={(e) => setFormData({ ...formData, preferredDomainId: e.target.value })}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">{domainsLoading ? "Loading domains…" : "Choose your internship domain"}</option>
+                  {domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
+                </select>
+                {domainsError ? <p className="text-sm text-destructive">{domainsError} Refresh the page to try again.</p> : null}
+                {domains.length === 0 && !domainsLoading && !domainsError ? <p className="text-sm text-destructive">No active internship domains are available right now.</p> : null}
+                <p className="text-xs text-muted-foreground">We’ll show you published internships for this domain after registration.</p>
               </div>
 
               <div className="space-y-2 pt-2">

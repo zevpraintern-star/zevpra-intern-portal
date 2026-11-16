@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireStaffPage } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
-import { saveProgramAction } from "@/app/admin/actions";
+import { deleteProgramAction, saveProgramAction } from "@/app/admin/actions";
 
 const dayInput = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
 
@@ -24,7 +24,8 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader title="Internships" description="Create and publish the programs students apply to." />
       <Table label="Internships"><thead><tr><Th>Title</Th><Th>Domain</Th><Th>Status</Th><Th>Applications</Th><Th>Tasks</Th><Th>Projects</Th><Th /></tr></thead><tbody>
-        {programs.map((x) => (<tr key={x.id}><Td className="font-medium">{x.title}</Td><Td>{x.domain.name}</Td><Td><StatusBadge value={x.status} /></Td><Td>{x._count.applications}</Td><Td>{x._count.tasks}</Td><Td>{x._count.projects}</Td><Td><Link className="text-primary hover:underline" href={`?edit=${x.id}#form`}>Edit</Link></Td></tr>))}</tbody></Table>
+        {programs.map((x) => (<tr key={x.id}><Td className="font-medium">{x.title}</Td><Td>{x.domain.name}</Td><Td><StatusBadge value={x.status} /></Td><Td>{x._count.applications}</Td><Td>{x._count.tasks}</Td><Td>{x._count.projects}</Td><Td className="space-x-3 whitespace-nowrap"><Link className="text-primary hover:underline" href={`?edit=${x.id}#form`}>Edit</Link>
+          <details className="inline"><summary className="inline cursor-pointer text-destructive">Delete</summary><div className="mt-2 w-64 whitespace-normal rounded-md border border-border bg-background p-3 text-sm"><p className="mb-2">This also deletes its tasks and projects. Deletion is blocked if student applications or submissions exist; archive it instead to preserve records.</p><ActionForm action={deleteProgramAction}><input type="hidden" name="id" value={x.id} /><input type="hidden" name="confirmation" value="DELETE" /><SubmitButton variant="destructive" size="sm">Confirm delete</SubmitButton></ActionForm></div></details></Td></tr>))}</tbody></Table>
       <Card className="mt-8" id="form"><CardHeader><CardTitle>{p ? `Edit: ${p.title}` : "New internship"}</CardTitle></CardHeader><CardContent>
         <ActionForm action={saveProgramAction} className="grid gap-5 md:grid-cols-2" key={p?.id ?? "new"}>
           {p ? <input type="hidden" name="id" value={p.id} /> : null}

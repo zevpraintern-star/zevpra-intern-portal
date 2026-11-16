@@ -20,14 +20,14 @@ export default async function InternshipPage({ searchParams }: { searchParams: P
     getPrisma().application.findMany({ where: { studentId: student.userId }, orderBy: { createdAt: "desc" }, include: { program: { select: { title: true, durationLabel: true } }, domain: { select: { name: true } } } }),
     listOpenPrograms(student.userId),
   ]);
-  const available = open.filter((p) => !p.applicationStatus);
+  const available = open.programs.filter((p) => !p.applicationStatus);
 
   return (
     <>
       <PageHeader title="My internship" description="Your applications, and internships you can still apply to. Every internship is free." />
       <Flash flash={flash} />
       <h2 className="mb-3 font-display text-lg font-semibold">My applications</h2>
-      {apps.length === 0 ? <EmptyState title="No applications yet">Pick an internship below.</EmptyState> : (
+      {apps.length === 0 ? <EmptyState title="No applications yet">Choose an internship in your selected domain below.</EmptyState> : (
         <div className="space-y-3">
           {apps.map((a) => (
             <Card key={a.id}><CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
@@ -46,7 +46,8 @@ export default async function InternshipPage({ searchParams }: { searchParams: P
       )}
 
       <h2 className="mb-3 mt-10 font-display text-lg font-semibold">Open internships</h2>
-      {available.length === 0 ? <EmptyState title="Nothing new to apply to right now" /> : (
+      {!open.hasPreferredDomain ? <EmptyState title="Choose your internship domain">Update your profile with your preferred domain to see matching internships. <Link className="text-primary underline" href="/student/profile">Update profile</Link></EmptyState>
+      : available.length === 0 ? <EmptyState title="Nothing new to apply to right now" /> : (
         <div className="grid gap-4 md:grid-cols-2">
           {available.map((p) => (
             <Card key={p.id}>

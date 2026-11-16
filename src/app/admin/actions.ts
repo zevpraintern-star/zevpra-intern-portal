@@ -101,6 +101,47 @@ export async function saveProgramAction(_: ActionState, form: FormData): Promise
   });
 }
 
+export async function deleteProgramAction(_: ActionState, form: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { actor } = await ctx("programs.manage");
+    const id = z.string().uuid().parse(str(form, "id"));
+    if (str(form, "confirmation") !== "DELETE") {
+      throw new ValidationError("Confirm deletion before continuing.");
+    }
+
+    const program = await getPrisma().internshipProgram.findUnique({
+      where: { id },
+      select: { id: true, title: true },
+    });
+    if (!program) throw new NotFoundError("Internship not found.");
+
+    const [applications, taskSubmissions, projectSubmissions] = await Promise.all([
+      getPrisma().application.count({ where: { programId: id } }),
+      getPrisma().taskSubmission.count({ where: { task: { programId: id } } }),
+      getPrisma().projectSubmission.count({ where: { project: { programId: id } } }),
+    ]);
+    if (applications + taskSubmissions + projectSubmissions > 0) {
+      throw new ConflictError("This internship has student applications or submissions. Archive it instead to preserve their records.");
+    }
+
+    try {
+      await getPrisma().internshipProgram.delete({ where: { id } });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2003") {
+        throw new ConflictError("This internship is linked to student records. Archive it instead to preserve their records.");
+      }
+      throw error;
+    }
+    await audit(actor, "PROGRAM_DELETED", "InternshipProgram", id, { title: program.title });
+    revalidatePath("/admin", "layout");
+    revalidatePath("/admin/programs");
+    revalidatePath("/admin/domains");
+    revalidatePath("/internships");
+    revalidatePath("/");
+    return "Internship deleted.";
+  });
+}
+
 export async function saveTaskAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
     const { staff, actor } = await ctx("tasks.manage");
@@ -394,11 +435,28 @@ export async function createStaffAction(_: ActionState, form: FormData): Promise
     const { actor } = await ctx("admins.manage");
     const data = z.object({ email: z.string().trim().toLowerCase().email().max(255), name: z.string().trim().min(2).max(120), role: z.enum(["MENTOR", "ADMIN", "SUPER_ADMIN"]), password: strongPassword })
       .parse({ email: str(form, "email"), name: str(form, "name"), role: str(form, "role"), password: str(form, "password") });
-    if (await getPrisma().user.findUnique({ where: { email: data.email }, select: { id: true } })) throw new ConflictError("An account with this email already exists.");
+    const existing = await getPrisma().user.findUnique({
+      where: { email: data.email },
+      select: { id: true, status: true, roles: { select: { role: { select: { key: true } } } } },
+    });
+    if (existing?.status === "DELETED") throw new ConflictError("This email belongs to a deleted account and cannot be reused.");
+    if (existing?.roles.some((r) => ["STUDENT", "MENTOR", "ADMIN", "SUPER_ADMIN"].includes(r.role.key))) {
+      throw new ConflictError("An account with this email already has a role. Change its role from the existing account instead.");
+    }
     const role = await getPrisma().role.findUniqueOrThrow({ where: { key: data.role } });
-    const user = await getPrisma().user.create({ data: { email: data.email, name: data.name, status: "ACTIVE", passwordHash: await hashPassword(data.password), emailVerifiedAt: new Date() } });
-    await getPrisma().userRole.create({ data: { userId: user.id, roleId: role.id } });
-    await audit(actor, "ADMIN_CREATED", "User", user.id, { role: data.role, email: data.email });
+    const passwordHash = await hashPassword(data.password);
+    const user = existing
+      ? await getPrisma().$transaction(async (tx) => {
+          const updated = await tx.user.update({ where: { id: existing.id }, data: { name: data.name, status: "ACTIVE", passwordHash, emailVerifiedAt: new Date() } });
+          await tx.userRole.create({ data: { userId: updated.id, roleId: role.id } });
+          return updated;
+        })
+      : await getPrisma().$transaction(async (tx) => {
+          const created = await tx.user.create({ data: { email: data.email, name: data.name, status: "ACTIVE", passwordHash, emailVerifiedAt: new Date() } });
+          await tx.userRole.create({ data: { userId: created.id, roleId: role.id } });
+          return created;
+        });
+    await audit(actor, "ADMIN_CREATED", "User", user.id, { role: data.role, email: data.email, restoredUnassignedAccount: Boolean(existing) });
     revalidatePath("/admin", "layout");
     return `${data.role.replace("_", " ").toLowerCase()} account created. Share the password with them through a secure channel; sign-in also needs an emailed code.`;
   });
@@ -427,6 +485,40 @@ export async function changeStaffRoleAction(_: ActionState, form: FormData): Pro
     revalidatePath("/admin", "layout");
     revalidateTag("role-permissions");
     return "Role changed. Their sessions were signed out so the new permissions apply immediately.";
+  });
+}
+
+export async function removeStaffAccessAction(_: ActionState, form: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { staff, actor } = await ctx("admins.manage");
+    const userId = z.string().uuid().parse(str(form, "userId"));
+    if (str(form, "confirmation") !== "REMOVE") throw new ValidationError("Confirm removal before continuing.");
+    if (userId === staff.userId) throw new ForbiddenError("You cannot remove your own staff access.");
+
+    const prisma = getPrisma();
+    const current = await prisma.userRole.findMany({
+      where: { userId, role: { key: { in: ["MENTOR", "ADMIN", "SUPER_ADMIN"] } } },
+      include: { role: true },
+    });
+    if (current.length === 0) throw new NotFoundError("Staff account not found.");
+    if (current.some((r) => r.role.key === "SUPER_ADMIN")) {
+      const activeSuperAdmins = await prisma.userRole.count({
+        where: { role: { key: "SUPER_ADMIN" }, user: { status: "ACTIVE" } },
+      });
+      const target = await prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
+      if (target?.status === "ACTIVE" && activeSuperAdmins <= 1) {
+        throw new ConflictError("There must always be at least one active super administrator.");
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.userRole.deleteMany({ where: { userId, roleId: { in: current.map((r) => r.roleId) } } }),
+      prisma.session.updateMany({ where: { userId, kind: "ADMIN", revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "staff_access_removed" } }),
+    ]);
+    await audit(actor, "ADMIN_ROLE_CHANGED", "User", userId, { removedStaffRoles: current.map((r) => r.role.key) });
+    revalidatePath("/admin", "layout");
+    revalidateTag("role-permissions");
+    return "Staff access removed and admin sessions signed out. The user account and audit history were retained.";
   });
 }
 

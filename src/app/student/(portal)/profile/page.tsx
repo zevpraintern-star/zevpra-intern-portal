@@ -8,7 +8,10 @@ import { updateProfileAction } from "@/app/student/actions";
 
 export default async function ProfilePage() {
   const student = await requireStudentPage();
-  const profile = await getPrisma().studentProfile.findUnique({ where: { userId: student.userId }, include: { resumeFile: { select: { originalName: true } } } });
+  const [profile, domains] = await Promise.all([
+    getPrisma().studentProfile.findUnique({ where: { userId: student.userId }, include: { resumeFile: { select: { originalName: true } } } }),
+    getPrisma().domain.findMany({ where: { isActive: true }, orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+  ]);
   if (!profile) return <PageHeader title="Profile" description="Your profile could not be found." />;
   const years = [1, 2, 3, 4, 5, 6].map((y) => ({ value: String(y), label: `Year ${y}` }));
   return (
@@ -22,6 +25,7 @@ export default async function ProfilePage() {
           <TextField label="University" name="university" defaultValue={profile.university ?? ""} />
           <TextField label="Degree" name="degree" defaultValue={profile.degree} required />
           <TextField label="Branch" name="branch" defaultValue={profile.branch} required />
+          <SelectField label="Internship domain" name="preferredDomainId" defaultValue={profile.preferredDomainId ?? ""} options={domains.map((domain) => ({ value: domain.id, label: domain.name }))} />
           <SelectField label="Year of study" name="yearOfStudy" defaultValue={String(profile.yearOfStudy)} options={years} />
           <TextField label="Graduation year" name="graduationYear" defaultValue={String(profile.graduationYear)} inputMode="numeric" required />
           <TextField label="State" name="state" defaultValue={profile.state ?? ""} />

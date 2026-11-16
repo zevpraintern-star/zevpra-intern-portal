@@ -12,6 +12,14 @@ export async function POST(req: NextRequest) {
     const json = await req.json();
     const parsed = studentRegistrationSchema.parse(json);
 
+    const preferredDomain = await getPrisma().domain.findFirst({
+      where: { id: parsed.preferredDomainId, isActive: true },
+      select: { id: true },
+    });
+    if (!preferredDomain) {
+      throw new ValidationError("Choose an active internship domain.", [{ field: "preferredDomainId", message: "Choose an active internship domain." }]);
+    }
+
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || undefined;
     const userAgent = req.headers.get("user-agent") || undefined;
     const normalisedEmail = parsed.email.trim().toLowerCase();

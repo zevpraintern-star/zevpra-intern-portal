@@ -96,10 +96,13 @@ export async function updateProfileAction(_: ActionState, form: FormData): Promi
     const data = profileSchema.parse({
       fullName: str(form, "fullName"), mobile: str(form, "mobile"), college: str(form, "college"), university: str(form, "university"),
       degree: str(form, "degree"), branch: str(form, "branch"), yearOfStudy: str(form, "yearOfStudy"), graduationYear: str(form, "graduationYear"),
+      preferredDomainId: str(form, "preferredDomainId"),
       state: str(form, "state"), city: str(form, "city"), country: str(form, "country") ?? "India",
       githubUrl: str(form, "githubUrl") ?? "", linkedinUrl: str(form, "linkedinUrl") ?? "", resumeFileId: strList(form, "resumeFileId")[0],
     });
     const { resumeFileId, ...rest } = data;
+    const activeDomain = await getPrisma().domain.findFirst({ where: { id: data.preferredDomainId, isActive: true }, select: { id: true } });
+    if (!activeDomain) throw new z.ZodError([{ code: "custom", path: ["preferredDomainId"], message: "Choose an active internship domain." }]);
     if (resumeFileId) {
       const file = await getPrisma().fileAsset.findFirst({ where: { id: resumeFileId, ownerUserId: student.userId, purpose: "RESUME", deletedAt: null }, select: { id: true } });
       if (!file) throw new z.ZodError([{ code: "custom", path: ["resumeFileId"], message: "That resume file is not available." }]);
