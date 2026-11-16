@@ -3,8 +3,10 @@ import Link from "next/link";
 import { PageHeader, Table, Td, Th } from "@/components/dashboard/primitives";
 import { Pagination, parsePaging } from "@/components/dashboard/pagination";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import { ActionForm, SubmitButton } from "@/components/forms/action-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { deleteStudentAction, setStudentStatusAction } from "@/app/admin/actions";
 import { can, requireStaffPage } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/utils/format";
@@ -28,14 +30,45 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
         <Input name="q" defaultValue={filter.q} placeholder="Search name, email, college, mobile" className="max-w-xs" aria-label="Search students" />
         <select name="domain" defaultValue={filter.domainId ?? ""} className={select} aria-label="Domain"><option value="">All domains</option>{domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
         <select name="app" defaultValue={filter.applicationStatus ?? ""} className={select} aria-label="Application status"><option value="">Any application</option>{["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"].map((s) => <option key={s}>{s}</option>)}</select>
-        <select name="status" defaultValue={filter.accountStatus ?? ""} className={select} aria-label="Account status"><option value="">Any account</option><option>ACTIVE</option><option>SUSPENDED</option></select>
+        <select name="status" defaultValue={filter.accountStatus ?? ""} className={select} aria-label="Account status"><option value="">Active and suspended</option><option value="ALL">Any account</option><option>ACTIVE</option><option>SUSPENDED</option><option>DELETED</option></select>
         <input type="hidden" name="size" value={size} /><Button type="submit">Filter</Button>
       </form>
       <Table label="Students">
-        <thead><tr><Th>{sortLink("name", "Name")}</Th><Th>Email</Th><Th>{sortLink("college", "College")}</Th><Th>{sortLink("branch", "Branch")}</Th><Th>{sortLink("year", "Year")}</Th><Th>Domain</Th><Th>Application</Th><Th>Internship</Th><Th>{sortLink("joined", "Joined")}</Th></tr></thead>
+        <thead><tr><Th>{sortLink("name", "Name")}</Th><Th>Email</Th><Th>{sortLink("college", "College")}</Th><Th>{sortLink("branch", "Branch")}</Th><Th>{sortLink("year", "Year")}</Th><Th>Domain</Th><Th>Application</Th><Th>Internship</Th><Th>{sortLink("joined", "Joined")}</Th><Th>Account</Th>{can(staff, "students.manage") ? <Th>Manage</Th> : null}</tr></thead>
         <tbody>
           {rows.length === 0 ? <tr><Td className="text-center text-muted-foreground" >No students match.</Td></tr> : rows.map((s) => { const a = s.user.applications[0]; return (
-            <tr key={s.id}><Td><Link className="font-medium text-primary hover:underline" href={`/admin/students/${s.user.id}`}>{s.fullName}</Link>{s.user.status === "SUSPENDED" ? <span className="ml-2"><StatusBadge value="SUSPENDED" /></span> : null}</Td><Td>{s.user.email}</Td><Td>{s.college}</Td><Td>{s.branch}</Td><Td>{s.yearOfStudy}</Td><Td>{a?.domain.name ?? "-"}</Td><Td><StatusBadge value={a?.status} /></Td><Td><StatusBadge value={a?.completionStatus} /></Td><Td>{formatDate(s.createdAt)}</Td></tr>); })}
+            <tr key={s.id}>
+              <Td><Link className="font-medium text-primary hover:underline" href={`/admin/students/${s.user.id}`}>{s.fullName}</Link></Td>
+              <Td>{s.user.email}</Td><Td>{s.college}</Td><Td>{s.branch}</Td><Td>{s.yearOfStudy}</Td>
+              <Td>{a?.domain.name ?? "-"}</Td><Td><StatusBadge value={a?.status} /></Td><Td><StatusBadge value={a?.completionStatus} /></Td>
+              <Td>{formatDate(s.createdAt)}</Td><Td><StatusBadge value={s.user.status} /></Td>
+              {can(staff, "students.manage") ? <Td>
+                <div className="flex flex-wrap items-center gap-2">
+                  {s.user.status !== "DELETED" || staff.isSuperAdmin ? (
+                    <ActionForm action={setStudentStatusAction} className="space-y-0">
+                      <input type="hidden" name="userId" value={s.user.id} />
+                      <input type="hidden" name="status" value={s.user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE"} />
+                      <SubmitButton size="sm" variant={s.user.status === "ACTIVE" ? "destructive" : "outline"}>
+                        {s.user.status === "ACTIVE" ? "Suspend / block" : s.user.status === "DELETED" ? "Restore" : "Reactivate"}
+                      </SubmitButton>
+                    </ActionForm>
+                  ) : null}
+                  {staff.isSuperAdmin && s.user.status !== "DELETED" ? (
+                    <details className="relative">
+                      <summary className="cursor-pointer text-sm text-destructive underline">Remove</summary>
+                      <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-border bg-background p-3 text-sm shadow-lg">
+                        <p className="mb-3">This removes the student’s access and signs them out. Their application and submission history is retained. A super administrator can restore the account.</p>
+                        <ActionForm action={deleteStudentAction} className="space-y-2">
+                          <input type="hidden" name="userId" value={s.user.id} />
+                          <input type="hidden" name="confirmation" value="DELETE" />
+                          <SubmitButton size="sm" variant="destructive">Confirm remove</SubmitButton>
+                        </ActionForm>
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              </Td> : null}
+            </tr>); })}
         </tbody>
       </Table>
       <Pagination base="/admin/students" params={{ q: filter.q, status: filter.accountStatus, domain: filter.domainId, app: filter.applicationStatus, sort: filter.sort, dir: filter.dir }} page={page} size={size} total={total} />

@@ -57,16 +57,49 @@ export async function reviewApplicationAction(_: ActionState, form: FormData): P
 
 export async function setStudentStatusAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { actor } = await ctx("students.manage");
+    const { staff, actor } = await ctx("students.manage");
     const userId = z.string().uuid().parse(str(form, "userId"));
     const status = z.enum(["ACTIVE", "SUSPENDED"]).parse(str(form, "status"));
-    const target = await getPrisma().user.findFirst({ where: { id: userId, roles: { some: { role: { key: "STUDENT" } } } }, select: { id: true } });
+    const target = await getPrisma().user.findFirst({ where: { id: userId, roles: { some: { role: { key: "STUDENT" } } } }, select: { id: true, status: true } });
     if (!target) throw new NotFoundError("Student not found.");
+    if (target.status === "DELETED" && (!staff.isSuperAdmin || status !== "ACTIVE")) {
+      throw new ForbiddenError("Only a super administrator can restore a removed student account.");
+    }
+    if (target.status === status) return status === "SUSPENDED" ? "Student is already suspended." : "Student is already active.";
     await getPrisma().user.update({ where: { id: userId }, data: { status } });
     if (status === "SUSPENDED") await getPrisma().session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "account_suspended" } });
     await audit(actor, status === "SUSPENDED" ? "STUDENT_SUSPENDED" : "STUDENT_REACTIVATED", "User", userId, { reason: str(form, "reason") });
     revalidatePath("/admin", "layout");
+    revalidatePath("/admin/students");
+    revalidatePath(`/admin/students/${userId}`);
     return status === "SUSPENDED" ? "Student suspended and signed out." : "Student reactivated.";
+  });
+}
+
+export async function deleteStudentAction(_: ActionState, form: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { actor } = await ctx("admins.manage");
+    const userId = z.string().uuid().parse(str(form, "userId"));
+    if (str(form, "confirmation") !== "DELETE") {
+      throw new ValidationError("Confirm removal before continuing.");
+    }
+
+    const target = await getPrisma().user.findFirst({
+      where: { id: userId, roles: { some: { role: { key: "STUDENT" } } } },
+      select: { id: true, status: true },
+    });
+    if (!target) throw new NotFoundError("Student not found.");
+    if (target.status === "DELETED") return "Student account is already removed.";
+
+    await getPrisma().$transaction([
+      getPrisma().user.update({ where: { id: userId }, data: { status: "DELETED" } }),
+      getPrisma().session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "account_deleted" } }),
+    ]);
+    await audit(actor, "STUDENT_DELETED", "User", userId, { reason: str(form, "reason") });
+    revalidatePath("/admin", "layout");
+    revalidatePath("/admin/students");
+    revalidatePath(`/admin/students/${userId}`);
+    return "Student removed and signed out. Their history is retained.";
   });
 }
 

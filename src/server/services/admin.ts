@@ -73,12 +73,36 @@ const SORTABLE: Record<string, string> = { name: "fullName", joined: "createdAt"
 
 export function studentWhere(f: StudentFilter): Prisma.StudentProfileWhereInput {
   const q = f.q?.trim().slice(0, 80);
+  const clauses: Prisma.StudentProfileWhereInput[] = [];
+  const userClauses: Prisma.UserWhereInput[] = [];
+
+  if (q) {
+    clauses.push({ OR: [
+      { fullName: { contains: q, mode: "insensitive" } },
+      { college: { contains: q, mode: "insensitive" } },
+      { user: { is: { email: { contains: q.toLowerCase() } } } },
+      { mobile: { contains: q } },
+    ] });
+  }
+
+  if (["ACTIVE", "SUSPENDED", "DELETED"].includes(f.accountStatus ?? "")) {
+    userClauses.push({ status: f.accountStatus as "ACTIVE" | "SUSPENDED" | "DELETED" });
+  } else if (f.accountStatus !== "ALL") {
+    userClauses.push({ status: { not: "DELETED" } });
+  }
+
+  if (f.domainId || f.applicationStatus) {
+    userClauses.push({ applications: { some: {
+      ...(f.domainId ? { domainId: f.domainId } : {}),
+      ...(["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"].includes(f.applicationStatus ?? "")
+        ? { status: f.applicationStatus as "PENDING" }
+        : {}),
+    } } });
+  }
+
+  if (userClauses.length) clauses.push({ user: { is: { AND: userClauses } } });
   return {
-    ...(q ? { OR: [{ fullName: { contains: q, mode: "insensitive" } }, { college: { contains: q, mode: "insensitive" } }, { user: { email: { contains: q.toLowerCase() } } }, { mobile: { contains: q } }] } : {}),
-    ...(f.accountStatus === "ACTIVE" || f.accountStatus === "SUSPENDED" ? { user: { status: f.accountStatus } } : {}),
-    ...(f.domainId || f.applicationStatus
-      ? { user: { applications: { some: { ...(f.domainId ? { domainId: f.domainId } : {}), ...(["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"].includes(f.applicationStatus ?? "") ? { status: f.applicationStatus as "PENDING" } : {}) } } } }
-      : {}),
+    ...(clauses.length ? { AND: clauses } : {}),
   };
 }
 
