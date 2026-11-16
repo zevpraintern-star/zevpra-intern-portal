@@ -78,10 +78,11 @@ export async function applyToProgram(studentId: string, input: z.infer<typeof ap
     templateKey: "application_received", variables: { programTitle: program.title },
   });
 
-  if (await isAutoApproveEnabled()) {
-    await decideApplication({ userId: null, role: "SYSTEM" }, { applicationId: application.id, decision: "APPROVED" });
-  }
+  // Always create application in PENDING status - admin approval required
+  // Do NOT auto-approve regardless of settings
+  
   return application;
+}
 }
 
 export async function withdrawApplication(studentId: string, applicationId: string): Promise<void> {
