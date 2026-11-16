@@ -790,134 +790,109 @@ async function main(): Promise<void> {
       }
     }
 
-    // 3.5. Internship programs, tasks and projects for every active domain --
+    // 3.5. Difficulty-tiered internship programs, tasks and projects for every active domain --
     const allDomains = await prisma.domain.findMany({ where: { isActive: true } });
 
     for (const domain of allDomains) {
-      const program = await prisma.internshipProgram.upsert({
-        where: { slug: `internship-${domain.slug}` },
-        update: {},
-        create: {
-          slug: `internship-${domain.slug}`,
-          title: `${domain.name} Internship`,
-          domainId: domain.id,
-          summary: `Build practical skills in ${domain.name} through structured tasks and a final capstone project.`,
-          description: `A comprehensive, free internship program in ${domain.name}. Complete hands-on tasks, submit your work for mentor review, build a final GitHub-hosted project, and earn a verified certificate.`,
-          durationWeeks: 8,
-          durationLabel: "8 weeks",
-          mode: "ONLINE",
-          difficulty: "BEGINNER",
-          skills: [domain.name],
-          prerequisites: [],
-          learningOutcomes: [
-            `Understand core concepts in ${domain.name}`,
-            "Complete practical, hands-on tasks",
-            "Build and submit a final capstone project",
-          ],
-          certificateRequirements: "Complete all required tasks and the final project. Certificate is optional.",
-          isFree: true,
-          status: "PUBLISHED",
-          isFeatured: false,
-          requiresFinalGithubLink: true,
-          minTasksForCompletion: 3,
-          publishedAt: new Date(),
-        },
-      });
-
-      // Tasks: 2 beginner, 1 intermediate, 1 advanced
-      const tasks = [
-        {
-          title: `Introduction to ${domain.name}`,
-          slug: `intro-${domain.slug}`,
-          difficulty: "BEGINNER",
-          submissionType: "MIXED",
-          requiresGithubLink: false,
-          description: `Get started with ${domain.name}. Learn the basics and submit your first piece of work.`,
-          instructions: `Research and write a short summary of what ${domain.name} is and why it matters. Include at least one example of real-world usage.`,
-          maxAttempts: 3,
-          points: 10,
-          sortOrder: 1,
-        },
-        {
-          title: `Fundamentals of ${domain.name}`,
-          slug: `fundamentals-${domain.slug}`,
-          difficulty: "BEGINNER",
-          submissionType: "GITHUB_LINK",
-          requiresGithubLink: true,
-          description: `Apply fundamental ${domain.name} concepts in a public GitHub repository.`,
-          instructions: `Create a public GitHub repository with starter code or documentation covering fundamental ${domain.name} topics. Submit the repository link.`,
-          maxAttempts: 3,
-          points: 15,
-          sortOrder: 2,
-        },
-        {
-          title: `Intermediate ${domain.name}`,
-          slug: `intermediate-${domain.slug}`,
-          difficulty: "INTERMEDIATE",
-          submissionType: "MIXED",
-          requiresGithubLink: true,
-          description: `Build a working deliverable in ${domain.name} and document your approach.`,
-          instructions: `Develop an intermediate-level project or solution in ${domain.name}. Host the code in a public GitHub repository and explain your design decisions.`,
-          maxAttempts: 2,
-          points: 25,
-          sortOrder: 3,
-        },
-        {
-          title: `Advanced ${domain.name} Capstone`,
-          slug: `advanced-${domain.slug}`,
-          difficulty: "ADVANCED",
-          submissionType: "GITHUB_LINK",
-          requiresGithubLink: true,
-          description: `Solve a real-world problem in ${domain.name} with a complete, documented solution.`,
-          instructions: `Build a production-quality solution for a real-world ${domain.name} problem. Include README, setup instructions, and tests where applicable. Submit the public GitHub repository link.`,
-          maxAttempts: 2,
-          points: 50,
-          sortOrder: 4,
-        },
+      const tracks = [
+        { key: "easy", label: "Easy", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
+          focus: "core concepts and guided practice", points: 10,
+          taskNames: ["Foundations and vocabulary", "Guided practical exercise", "Small independent deliverable"],
+          project: "Foundations Portfolio" },
+        { key: "medium", label: "Medium", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
+          focus: "applied techniques and independent problem solving", points: 20,
+          taskNames: ["Analyze a real use case", "Build a working prototype", "Validate and document your solution"],
+          project: "Applied Solution" },
+        { key: "hard", label: "Hard", difficulty: "ADVANCED" as const, taskDifficulty: "ADVANCED" as const, weeks: 8,
+          focus: "system design, tradeoffs, and a production-minded solution", points: 35,
+          taskNames: ["Scope and justify a complex problem", "Implement an end-to-end solution", "Evaluate, improve, and present results"],
+          project: "Industry Challenge Capstone" },
       ];
 
-      for (const taskData of tasks) {
-        await prisma.task.upsert({
-          where: { programId_slug: { programId: program.id, slug: taskData.slug } },
+      for (const track of tracks) {
+        const programSlug = `internship-${domain.slug}-${track.key}`;
+        const program = await prisma.internshipProgram.upsert({
+          where: { slug: programSlug },
           update: {},
           create: {
-            ...taskData,
-            programId: program.id,
+            slug: programSlug,
+            title: `${domain.name} Internship — ${track.label}`,
             domainId: domain.id,
-            difficulty: taskData.difficulty as "BEGINNER" | "INTERMEDIATE" | "ADVANCED",
-            submissionType: taskData.submissionType as "MIXED" | "GITHUB_LINK" | "LIVE_URL" | "TEXT",
+            summary: `${track.label} ${domain.name} internship with three practical tasks and a guided capstone.`,
+            description: `A free ${track.label.toLowerCase()}-level ${domain.name} internship. Learn through ${track.focus}, complete three mentor-reviewed tasks, and finish with a GitHub-hosted project suited to this level.`,
+            durationWeeks: track.weeks,
+            durationLabel: `${track.weeks} weeks`,
+            mode: "ONLINE",
+            difficulty: track.difficulty,
+            skills: [domain.name],
+            prerequisites: track.key === "easy" ? [] : [`Foundational knowledge of ${domain.name}`],
+            learningOutcomes: [
+              `Apply ${track.focus} in ${domain.name}`,
+              "Complete three practical, reviewable tasks",
+              `Build a ${track.label.toLowerCase()}-level capstone project`,
+            ],
+            certificateRequirements: "Complete the required tasks and have the final project verified. Certificate is optional.",
+            isFree: true,
+            status: "PUBLISHED",
+            isFeatured: false,
+            requiresFinalGithubLink: true,
+            minTasksForCompletion: 3,
+            publishedAt: new Date(),
+          },
+        });
+
+        for (const [index, taskName] of track.taskNames.entries()) {
+          const slug = `${track.key}-${domain.slug}-${index + 1}`;
+          await prisma.task.upsert({
+            where: { programId_slug: { programId: program.id, slug } },
+            update: {},
+            create: {
+              programId: program.id,
+              domainId: domain.id,
+              title: `${track.label} ${domain.name}: ${taskName}`,
+              slug,
+              description: `${taskName} using concepts and tools from ${domain.name}.`,
+              instructions: `Create a focused ${domain.name} deliverable for this ${track.label.toLowerCase()}-level task. State the problem, explain your approach, show the result, and note what you would improve next. For code or design artifacts, submit a public GitHub repository with a clear README.`,
+              difficulty: track.taskDifficulty,
+              submissionType: "MIXED",
+              requiresGithubLink: true,
+              maxAttempts: track.key === "hard" ? 2 : 3,
+              points: track.points + index * 5,
+              sortOrder: index + 1,
+              status: "PUBLISHED",
+              publishedAt: new Date(),
+            },
+          });
+        }
+
+        const projectSlug = `${track.key}-capstone-${domain.slug}`;
+        await prisma.project.upsert({
+          where: { programId_slug: { programId: program.id, slug: projectSlug } },
+          update: {},
+          create: {
+            programId: program.id,
+            slug: projectSlug,
+            title: `${track.label} ${domain.name}: ${track.project}`,
+            description: `Design and deliver a ${track.label.toLowerCase()}-level ${domain.name} capstone. Demonstrate the skills from the internship, document key decisions, and publish the work in a public GitHub repository.`,
+            requirements: [
+              `A working ${domain.name} solution appropriate to the ${track.label.toLowerCase()} level`,
+              "Public GitHub repository with source files or project documentation",
+              "README explaining the problem, setup, usage, and design decisions",
+              "Evidence of validation, testing, or measured results",
+            ],
+            skills: [domain.name],
+            submissionMethod: "GITHUB_LINK",
+            requiresGithubLink: true,
+            requiresLiveUrl: false,
+            isFinalProject: true,
+            difficulty: track.difficulty,
+            maxScore: 100,
+            sortOrder: 1,
             status: "PUBLISHED",
             publishedAt: new Date(),
           },
         });
       }
-
-      // Final capstone project
-      await prisma.project.upsert({
-        where: { programId_slug: { programId: program.id, slug: `final-project-${domain.slug}` } },
-        update: {},
-        create: {
-          programId: program.id,
-          slug: `final-project-${domain.slug}`,
-          title: `Final Capstone Project: ${domain.name}`,
-          description: `Build a comprehensive capstone project in ${domain.name} that demonstrates your end-to-end skills. Host it in a public GitHub repository.`,
-          requirements: [
-            "Public GitHub repository with source code",
-            "README with setup and usage instructions",
-            "Working demo or documented output",
-          ],
-          skills: [domain.name],
-          submissionMethod: "GITHUB_LINK",
-          requiresGithubLink: true,
-          requiresLiveUrl: false,
-          isFinalProject: true,
-          difficulty: "INTERMEDIATE",
-          maxScore: 100,
-          sortOrder: 1,
-          status: "PUBLISHED",
-          publishedAt: new Date(),
-        },
-      });
     }
 
     // 4. Runtime settings ----------------------------------------------------
@@ -1042,7 +1017,7 @@ async function main(): Promise<void> {
 
     console.info("[seed] completed");
     console.info(
-      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length} tasks=${allDomains.length * 4} projects=${allDomains.length} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
+      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length * 3} tasks=${allDomains.length * 9} projects=${allDomains.length * 3} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
     );
     console.info(`[seed] super admin: ${adminNote}`);
   } finally {
