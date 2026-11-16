@@ -25,6 +25,44 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const PASSWORD_PREFIX = "scrypt";
 const SCRYPT_KEY_LENGTH = 64;
 const SCRYPT_SALT_BYTES = 16;
+const MAX_SEED_ATTEMPTS = 5;
+
+function isTransientDatabaseError(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as {
+      code?: unknown;
+      message?: unknown;
+      cause?: unknown;
+      meta?: { driverAdapterError?: { cause?: unknown } };
+    };
+    const code = typeof candidate.code === "string" ? candidate.code : "";
+    const message = typeof candidate.message === "string" ? candidate.message : "";
+
+    if (
+      ["P1001", "P1002", "P1017", "ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "57P01", "08003", "08006"].includes(code)
+      || /connection (closed|terminated|reset)|server has closed the connection|connection timeout|socket hang up/i.test(message)
+    ) {
+      return true;
+    }
+
+    current = candidate.meta?.driverAdapterError?.cause ?? candidate.cause;
+  }
+
+  return false;
+}
+
+function retryDelayMs(attempt: number): number {
+  const baseMs = Math.min(1_000 * 2 ** (attempt - 1), 15_000);
+  return baseMs + Math.floor(Math.random() * 500);
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SCRYPT_SALT_BYTES);
@@ -695,7 +733,13 @@ function createClient(): { prisma: PrismaClient; disconnect: () => Promise<void>
       "DATABASE_URL is not set. Copy .env.example to .env.local and configure PostgreSQL.",
     );
   }
-  const adapter = new PrismaPg({ connectionString });
+  const adapter = new PrismaPg({
+    connectionString,
+    max: 4,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    keepAlive: true,
+  });
   const prisma = new PrismaClient({ adapter });
   return { prisma, disconnect: () => prisma.$disconnect() };
 }
@@ -714,7 +758,7 @@ function plannedSummary() {
   };
 }
 
-async function main(): Promise<void> {
+async function main(attempt = 1): Promise<void> {
   if (DRY_RUN) {
     console.info("[seed] dry run - no database writes performed");
     console.info(`[seed] planned payload: ${JSON.stringify(plannedSummary(), null, 2)}`);
@@ -723,6 +767,7 @@ async function main(): Promise<void> {
 
   const { prisma, disconnect } = createClient();
 
+  let shouldRetry = false;
   try {
     // 1. Permissions ---------------------------------------------------------
     for (const permission of PERMISSIONS) {
@@ -869,23 +914,55 @@ async function main(): Promise<void> {
           },
         });
 
+        const domainsWithDeployableTasks = new Set([
+          "software-development",
+          "web-development",
+          "full-stack-development",
+          "mobile-development",
+          "cloud-computing",
+          "devops",
+          "python",
+          "java",
+          "c-cpp",
+          "artificial-intelligence",
+          "machine-learning",
+          "deep-learning",
+          "data-science",
+          "data-analytics",
+          "generative-ai",
+          "nlp",
+          "computer-vision",
+          "blockchain",
+        ]);
+
         for (const [index, taskPlan] of track.tasks.entries()) {
           const slug = `${track.key}-${domain.slug}-${index + 1}`;
+          const requiresLiveUrl = domainsWithDeployableTasks.has(domain.slug) && [
+            "Build a working prototype",
+            "Implement and integrate components",
+            "Deliver an end-to-end solution",
+          ].includes(taskPlan.title);
+          const taskInstructions = `${taskPlan.instructions} ${requiresLiveUrl
+            ? "Deploy the working app or service and submit BOTH its public GitHub repository URL and HTTPS live URL."
+            : "Submit the public GitHub repository URL with your source code, documentation, and evidence. Deployment is not required for this task; a live URL is not needed."}`;
+          const submissionType = requiresLiveUrl ? "LIVE_URL" as const : "GITHUB_LINK" as const;
           const existingTask = await prisma.task.findUnique({
             where: { programId_slug: { programId: program.id, slug } },
             select: { description: true, instructions: true },
           });
-          const isLegacyGeneratedTask = Boolean(
-            existingTask?.instructions?.startsWith(`Create a focused ${domain.name} deliverable for this `),
+          const isSeedManagedTask = Boolean(
+            existingTask?.instructions?.startsWith(`Create a focused ${domain.name} deliverable for this `)
+            || existingTask?.instructions === taskPlan.instructions
+            || existingTask?.instructions === taskInstructions,
           );
           await prisma.task.upsert({
             where: { programId_slug: { programId: program.id, slug } },
-            update: isLegacyGeneratedTask ? {
+            update: isSeedManagedTask ? {
               title: `${track.label} ${domain.name}: ${taskPlan.title}`,
               description: taskPlan.description,
-              instructions: taskPlan.instructions,
+              instructions: taskInstructions,
               difficulty: track.taskDifficulty,
-              submissionType: "MIXED",
+              submissionType,
               requiresGithubLink: true,
               maxAttempts: track.key === "hard" ? 2 : 3,
               points: track.points + index * 5,
@@ -898,9 +975,9 @@ async function main(): Promise<void> {
               title: `${track.label} ${domain.name}: ${taskPlan.title}`,
               slug,
               description: taskPlan.description,
-              instructions: taskPlan.instructions,
+              instructions: taskInstructions,
               difficulty: track.taskDifficulty,
-              submissionType: "MIXED",
+              submissionType,
               requiresGithubLink: true,
               maxAttempts: track.key === "hard" ? 2 : 3,
               points: track.points + index * 5,
@@ -1066,8 +1143,20 @@ async function main(): Promise<void> {
       `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length * 5} tasks=${allDomains.length * 15} projects=${allDomains.length * 5} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
     );
     console.info(`[seed] super admin: ${adminNote}`);
+  } catch (error) {
+    if (!isTransientDatabaseError(error) || attempt >= MAX_SEED_ATTEMPTS) {
+      throw error;
+    }
+    shouldRetry = true;
   } finally {
     await disconnect();
+  }
+
+  if (shouldRetry) {
+    const delayMs = retryDelayMs(attempt);
+    console.warn(`[seed] transient database connection error; retrying full idempotent seed in ${delayMs}ms (attempt ${attempt + 1}/${MAX_SEED_ATTEMPTS})`);
+    await wait(delayMs);
+    return main(attempt + 1);
   }
 }
 
