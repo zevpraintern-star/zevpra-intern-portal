@@ -363,7 +363,7 @@ const APP_SETTINGS: Array<{
   },
   {
     key: "brand.support_email",
-    value: process.env.SUPPORT_EMAIL ?? "support@example.com",
+    value: process.env.SUPPORT_EMAIL ?? "zevpra.intern@gmail.com",
     valueType: "STRING",
     category: "branding",
     label: "Support email",

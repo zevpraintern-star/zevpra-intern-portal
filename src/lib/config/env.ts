@@ -44,7 +44,7 @@ export const envSchema = z
     COMPANY_DOMAIN: z.preprocess(emptyToUndefined, z.string().trim().default("localhost:3000")),
     SUPPORT_EMAIL: z.preprocess(
       emptyToUndefined,
-      z.string().trim().email().default("support@example.com"),
+      z.string().trim().email().default("zevpra.intern@gmail.com"),
     ),
     CONTACT_EMAIL: optionalString,
     PRIMARY_COLOR: z.preprocess(emptyToUndefined, z.string().trim().default("#4f46e5")),
