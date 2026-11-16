@@ -1,0 +1,2 @@
+ALTER TABLE "certificates" ADD COLUMN IF NOT EXISTS "project_difficulty" "DifficultyLevel" NOT NULL DEFAULT 'BEGINNER';
+ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "difficulty" "DifficultyLevel" NOT NULL DEFAULT 'BEGINNER';

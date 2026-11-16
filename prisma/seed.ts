@@ -795,15 +795,23 @@ async function main(): Promise<void> {
 
     for (const domain of allDomains) {
       const tracks = [
-        { key: "easy", label: "Easy", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
+        { key: "easy", label: "Easy: Foundations", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
           focus: "core concepts and guided practice", points: 10,
           taskNames: ["Foundations and vocabulary", "Guided practical exercise", "Small independent deliverable"],
           project: "Foundations Portfolio" },
-        { key: "medium", label: "Medium", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
+        { key: "easy-lab", label: "Easy: Practical Lab", difficulty: "BEGINNER" as const, taskDifficulty: "BEGINNER" as const, weeks: 4,
+          focus: "guided labs, essential tools, and small practical outcomes", points: 10,
+          taskNames: ["Explore the essential tools", "Complete a guided domain lab", "Present a small practical result"],
+          project: "Practical Skills Showcase" },
+        { key: "medium", label: "Medium: Applied Analysis", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
           focus: "applied techniques and independent problem solving", points: 20,
           taskNames: ["Analyze a real use case", "Build a working prototype", "Validate and document your solution"],
           project: "Applied Solution" },
-        { key: "hard", label: "Hard", difficulty: "ADVANCED" as const, taskDifficulty: "ADVANCED" as const, weeks: 8,
+        { key: "medium-build", label: "Medium: Integrated Build", difficulty: "INTERMEDIATE" as const, taskDifficulty: "INTERMEDIATE" as const, weeks: 6,
+          focus: "combining domain techniques into a complete, tested deliverable", points: 20,
+          taskNames: ["Plan an integrated solution", "Build and document its core components", "Test it against clear acceptance criteria"],
+          project: "Integrated Domain Solution" },
+        { key: "hard", label: "Hard: Industry Challenge", difficulty: "ADVANCED" as const, taskDifficulty: "ADVANCED" as const, weeks: 8,
           focus: "system design, tradeoffs, and a production-minded solution", points: 35,
           taskNames: ["Scope and justify a complex problem", "Implement an end-to-end solution", "Evaluate, improve, and present results"],
           project: "Industry Challenge Capstone" },
@@ -816,7 +824,7 @@ async function main(): Promise<void> {
           update: {},
           create: {
             slug: programSlug,
-            title: `${domain.name} Internship — ${track.label}`,
+            title: `${domain.name} Internship - ${track.label}`,
             domainId: domain.id,
             summary: `${track.label} ${domain.name} internship with three practical tasks and a guided capstone.`,
             description: `A free ${track.label.toLowerCase()}-level ${domain.name} internship. Learn through ${track.focus}, complete three mentor-reviewed tasks, and finish with a GitHub-hosted project suited to this level.`,
@@ -1017,7 +1025,7 @@ async function main(): Promise<void> {
 
     console.info("[seed] completed");
     console.info(
-      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length * 3} tasks=${allDomains.length * 9} projects=${allDomains.length * 3} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
+      `[seed] permissions=${PERMISSIONS.length} roles=${Object.keys(ROLE_MATRIX).length} domains=${domainTotal} programs=${allDomains.length * 5} tasks=${allDomains.length * 15} projects=${allDomains.length * 5} settings=${APP_SETTINGS.length} sections=${HOMEPAGE_SECTIONS.length} emailTemplates=${EMAIL_TEMPLATES.length}`,
     );
     console.info(`[seed] super admin: ${adminNote}`);
   } finally {
