@@ -53,11 +53,11 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                       </SubmitButton>
                     </ActionForm>
                   ) : null}
-                  {staff.isSuperAdmin && s.user.status !== "DELETED" ? (
+                  {staff.isSuperAdmin ? (
                     <details className="relative">
                       <summary className="cursor-pointer text-sm text-destructive underline">Remove</summary>
                       <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-border bg-background p-3 text-sm shadow-lg">
-                        <p className="mb-3">This removes the student’s access and signs them out. Their application and submission history is retained. A super administrator can restore the account.</p>
+                        <p className="mb-3">This permanently deletes the account and linked applications, submissions, payment records, and certificates. The student can register again with the same email. This cannot be undone.</p>
                         <ActionForm action={deleteStudentAction} className="space-y-2">
                           <input type="hidden" name="userId" value={s.user.id} />
                           <input type="hidden" name="confirmation" value="DELETE" />

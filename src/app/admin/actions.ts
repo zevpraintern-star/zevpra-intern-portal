@@ -89,17 +89,18 @@ export async function deleteStudentAction(_: ActionState, form: FormData): Promi
       select: { id: true, status: true },
     });
     if (!target) throw new NotFoundError("Student not found.");
-    if (target.status === "DELETED") return "Student account is already removed.";
 
-    await getPrisma().$transaction([
-      getPrisma().user.update({ where: { id: userId }, data: { status: "DELETED" } }),
-      getPrisma().session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "account_deleted" } }),
-    ]);
-    await audit(actor, "STUDENT_DELETED", "User", userId, { reason: str(form, "reason") });
+    await getPrisma().$transaction(async (tx) => {
+      // Certificates restrict User deletion, so remove them explicitly first.
+      // Other student-owned records cascade from User according to the schema.
+      await tx.certificate.deleteMany({ where: { studentId: userId } });
+      await tx.user.delete({ where: { id: userId } });
+    });
+    await audit(actor, "STUDENT_DELETED", "User", userId, { reason: str(form, "reason"), permanent: true });
     revalidatePath("/admin", "layout");
     revalidatePath("/admin/students");
     revalidatePath(`/admin/students/${userId}`);
-    return "Student removed and signed out. Their history is retained.";
+    return "Student account and linked records permanently deleted. Their email can be used to register again.";
   });
 }
 

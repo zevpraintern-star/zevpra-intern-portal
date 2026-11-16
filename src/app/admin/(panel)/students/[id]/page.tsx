@@ -34,7 +34,7 @@ export default async function StudentDetail({ params }: { params: Promise<{ id: 
           <Card><CardHeader><CardTitle>Account</CardTitle></CardHeader><CardContent>
             <ActionForm action={setStudentStatusAction} className="max-w-md"><input type="hidden" name="userId" value={user.id} /><input type="hidden" name="status" value={user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE"} />
               <TextField label="Reason (recorded in the audit log)" name="reason" />
-              <SubmitButton variant={user.status === "ACTIVE" ? "destructive" : "default"}>{user.status === "ACTIVE" ? "Suspend and sign out" : "Reactivate"}</SubmitButton></ActionForm>
+              <SubmitButton variant={user.status === "ACTIVE" ? "destructive" : "default"}>{user.status === "ACTIVE" ? "Suspend / block and sign out" : user.status === "DELETED" ? "Restore account" : "Reactivate"}</SubmitButton></ActionForm>
           </CardContent></Card>) : null}
       </div>
     </>
