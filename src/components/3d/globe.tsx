@@ -194,8 +194,10 @@ export function Globe({ palette, lite, introStart }: GlobeProps) {
 
     const wide = size.width / size.height > 1.15;
     const targetX = wide ? 2.5 : 0;
-    const targetY = wide ? 0 : 3.1;
-    const targetScale = wide ? 1 : 0.66;
+    // Lower and enlarge the opening globe so it fills the right side of the hero
+    // instead of leaving a large pocket of empty space beneath it.
+    const targetY = wide ? -1.1 : 3.1;
+    const targetScale = wide ? 1.2 : 0.66;
     g.position.x = THREE.MathUtils.damp(g.position.x, targetX, 3, delta);
     g.position.y = THREE.MathUtils.damp(g.position.y, targetY, 3, delta);
 

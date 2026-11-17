@@ -34,7 +34,8 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error?.message || "Failed to request code.");
+        const emailError = data.error?.details?.find((detail: { field: string }) => detail.field === "email")?.message;
+        throw new Error(emailError || data.error?.message || "Failed to request code.");
       }
 
       setInfo(data.data.message);

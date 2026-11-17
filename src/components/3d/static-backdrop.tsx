@@ -25,7 +25,7 @@ export function StaticBackdrop() {
       <div className="absolute inset-0 bg-[radial-gradient(70%_55%_at_75%_30%,color-mix(in_oklch,var(--color-primary)_22%,transparent),transparent_70%),radial-gradient(50%_45%_at_15%_75%,color-mix(in_oklch,var(--brand-cyan)_16%,transparent),transparent_70%)]" />
       <svg
         viewBox="-110 -110 220 220"
-        className="absolute right-[-12%] top-[6%] h-[70vmin] w-[70vmin] text-primary sm:right-[4%] sm:top-[12%] sm:h-[78vmin] sm:w-[78vmin]"
+        className="absolute right-[-12%] top-[6%] h-[70vmin] w-[70vmin] text-primary sm:right-0 sm:top-[20%] sm:h-[90vmin] sm:w-[90vmin]"
         fill="none"
       >
         <circle r="80" stroke="currentColor" strokeOpacity="0.35" />

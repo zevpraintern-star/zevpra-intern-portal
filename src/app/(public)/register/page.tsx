@@ -67,7 +67,10 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, purpose: "STUDENT_REGISTER" }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message || "Failed to send code.");
+      if (!data.success) {
+        const emailError = data.error?.details?.find((detail: { field: string }) => detail.field === "email")?.message;
+        throw new Error(emailError || data.error?.message || "Failed to send code.");
+      }
       setInfo(data.data.message);
       setOtpSent(true);
     } catch (err: any) {

@@ -20,6 +20,8 @@ const ACADEMIC_EMAIL_SUFFIXES = [".edu", ".edu.in", ".ac.in", ".ac.uk", ".edu.au
 const PERSONAL_EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "protonmail.com"];
 const KNOWN_EMAIL_DOMAIN_TYPOS: Record<string, string> = {
   "gmial.com": "gmail.com",
+  "gmial.comm": "gmail.com",
+  "gmail.comm": "gmail.com",
   "gmal.com": "gmail.com",
   "gmai.com": "gmail.com",
   "gmg.com": "gmail.com",
@@ -51,19 +53,29 @@ export const studentEmailSchema = emailSchema.superRefine((email, context) => {
     return;
   }
 
-  // Catch one-character errors and adjacent transpositions for common personal providers.
-  const transposeDistance = (left: string, right: string) => {
-    if (left.length !== right.length) return Infinity;
-    const differences: number[] = [];
-    for (let i = 0; i < left.length; i += 1) if (left[i] !== right[i]) differences.push(i);
-    if (differences.length === 1) return 1;
-    if (differences.length === 2 && differences[1] === differences[0] + 1) {
-      const first = differences[0];
-      return left[first] === right[first + 1] && left[first + 1] === right[first] ? 1 : Infinity;
+  // Catch up to two edits (including transposed letters and extra/missing characters)
+  // around common personal providers, e.g. "gmial.comm" -> "gmail.com".
+  const editDistance = (left: string, right: string) => {
+    const rows = left.length + 1;
+    const cols = right.length + 1;
+    const distance = Array.from({ length: rows }, (_, i) =>
+      Array.from({ length: cols }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+    );
+    for (let i = 1; i < rows; i += 1) {
+      for (let j = 1; j < cols; j += 1) {
+        distance[i][j] = Math.min(
+          distance[i - 1][j] + 1,
+          distance[i][j - 1] + 1,
+          distance[i - 1][j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1),
+        );
+        if (i > 1 && j > 1 && left[i - 1] === right[j - 2] && left[i - 2] === right[j - 1]) {
+          distance[i][j] = Math.min(distance[i][j], distance[i - 2][j - 2] + 1);
+        }
+      }
     }
-    return Infinity;
+    return distance[left.length][right.length];
   };
-  const closeDomain = PERSONAL_EMAIL_DOMAINS.find((candidate) => transposeDistance(domain, candidate) === 1);
+  const closeDomain = PERSONAL_EMAIL_DOMAINS.find((candidate) => editDistance(domain, candidate) <= 2);
   if (closeDomain) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
