@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, Mail } from "lucide-react";
@@ -19,9 +19,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const emailEditVersion = useRef(0);
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    const submittedEditVersion = emailEditVersion.current;
     setError(null);
     setLoading(true);
 
@@ -33,6 +35,7 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
+      if (submittedEditVersion !== emailEditVersion.current) return;
       if (!data.success) {
         const emailError = data.error?.details?.find((detail: { field: string }) => detail.field === "email")?.message;
         throw new Error(emailError || data.error?.message || "Failed to request code.");
@@ -41,7 +44,9 @@ export default function LoginPage() {
       setInfo(data.data.message);
       setStep("otp");
     } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+      if (submittedEditVersion === emailEditVersion.current) {
+        setError(err.message || "Something went wrong.");
+      }
     } finally {
       setLoading(false);
     }
@@ -110,6 +115,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => {
+                      emailEditVersion.current += 1;
                       setEmail(e.target.value);
                       setError(null);
                       setInfo(null);

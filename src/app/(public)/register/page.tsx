@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, Mail, ShieldCheck } from "lucide-react";
@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const emailEditVersion = useRef(0);
   const [countryCode, setCountryCode] = useState<string>("+91");
   const [domains, setDomains] = useState<Array<{ id: string; name: string }>>([]);
   const [domainsLoading, setDomainsLoading] = useState(true);
@@ -58,6 +59,7 @@ export default function RegisterPage() {
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    const submittedEditVersion = emailEditVersion.current;
     setError(null);
     setLoading(true);
     try {
@@ -67,6 +69,7 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, purpose: "STUDENT_REGISTER" }),
       });
       const data = await res.json();
+      if (submittedEditVersion !== emailEditVersion.current) return;
       if (!data.success) {
         const emailError = data.error?.details?.find((detail: { field: string }) => detail.field === "email")?.message;
         throw new Error(emailError || data.error?.message || "Failed to send code.");
@@ -74,7 +77,7 @@ export default function RegisterPage() {
       setInfo(data.data.message);
       setOtpSent(true);
     } catch (err: any) {
-      setError(err.message);
+      if (submittedEditVersion === emailEditVersion.current) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -166,6 +169,7 @@ export default function RegisterPage() {
                         required
                         value={email}
                         onChange={(e) => {
+                          emailEditVersion.current += 1;
                           setEmail(e.target.value);
                           setError(null);
                           setInfo(null);
