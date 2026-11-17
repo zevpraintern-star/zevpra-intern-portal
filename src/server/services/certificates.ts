@@ -39,20 +39,13 @@ function safe(font: PDFFont, text: string): string {
   return [...text].map((ch) => (set.has(ch.codePointAt(0) ?? 0) ? ch : " ")).join("").replace(/\s+/g, " ").trim();
 }
 
-function hexToRgb(hex: string, fallback: [number, number, number]) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return rgb(...fallback);
-  const n = parseInt(m[1] as string, 16);
-  return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
-}
-
 function formatLongDate(date: Date | null | undefined): string {
   return (date ?? new Date()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 export async function renderCertificatePdf(cert: {
   certificateId: string; verificationUrl: string; studentName: string; programTitle: string; domainName: string;
-  duration: string; completionDate: Date | null; issueDate: Date; companyName: string; primaryColor: string; disclaimer: string;
+  duration: string; completionDate: Date | null; issueDate: Date; companyName: string; disclaimer: string;
   difficulty: DifficultyLevel; templateKey: CertificateTemplateKey;
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -64,17 +57,14 @@ export async function renderCertificatePdf(cert: {
   const sansBold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const tier = TIER_SPEC[cert.templateKey];
   const white = rgb(1, 1, 1);
-  const primary = hexToRgb(cert.primaryColor, [0.31, 0.27, 0.9]);
-  const ink = rgb(0.1, 0.12, 0.2);
-  const muted = rgb(0.4, 0.43, 0.5);
-
-  const navy = rgb(0.055, 0.085, 0.16);
-  const bodyInk = rgb(0.12, 0.16, 0.24);
-  const secondary = rgb(0.39, 0.45, 0.55);
+  const navy = rgb(0.025, 0.045, 0.085);
+  const bodyInk = rgb(0.92, 0.95, 1);
+  const secondary = rgb(0.66, 0.74, 0.87);
   const gold = rgb(0.76, 0.59, 0.31);
-  const paper = rgb(0.995, 0.997, 1);
-  const panel = rgb(0.94, 0.956, 0.98);
-  const tierColor = rgb(...tier.stripe);
+  const paper = rgb(0.045, 0.075, 0.13);
+  const panel = rgb(0.075, 0.12, 0.2);
+  const primary = rgb(0.53, 0.69, 1);
+  const tierColor = rgb(0.16, 0.28, 0.44);
 
   const centered = (text: string, y: number, font: PDFFont, size: number, color = bodyInk, maxWidth = width - 100) => {
     const value = safe(font, text);
@@ -95,8 +85,8 @@ export async function renderCertificatePdf(cert: {
   };
 
   // Clean landscape frame with restrained navy, gold and brand-color accents.
-  page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0.94, 0.955, 0.975) });
-  page.drawRectangle({ x: 18, y: 18, width: width - 36, height: height - 36, color: paper, borderColor: navy, borderWidth: 1.2 });
+  page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0.018, 0.032, 0.065) });
+  page.drawRectangle({ x: 18, y: 18, width: width - 36, height: height - 36, color: paper, borderColor: rgb(0.23, 0.36, 0.55), borderWidth: 1.2 });
   page.drawRectangle({ x: 27, y: 27, width: width - 54, height: height - 54, borderColor: gold, borderWidth: 0.7 });
 
   // Brand header and certificate level badge.
@@ -124,8 +114,8 @@ export async function renderCertificatePdf(cert: {
   const panelH = 52;
   page.drawRectangle({ x: panelX, y: panelY, width: panelW, height: panelH, color: panel });
   const colW = panelW / 3;
-  page.drawLine({ start: { x: panelX + colW, y: panelY + 8 }, end: { x: panelX + colW, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.82, 0.85, 0.9) });
-  page.drawLine({ start: { x: panelX + colW * 2, y: panelY + 8 }, end: { x: panelX + colW * 2, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.82, 0.85, 0.9) });
+  page.drawLine({ start: { x: panelX + colW, y: panelY + 8 }, end: { x: panelX + colW, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.19, 0.28, 0.41) });
+  page.drawLine({ start: { x: panelX + colW * 2, y: panelY + 8 }, end: { x: panelX + colW * 2, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.19, 0.28, 0.41) });
   const facts = [
     { label: "DOMAIN", value: cert.domainName },
     { label: "DURATION", value: cert.duration },
@@ -145,7 +135,7 @@ export async function renderCertificatePdf(cert: {
   page.drawText(issued, { x: 486, y: 183, size: 9, font: sans, color: secondary });
 
   // Verification footer: ID and URL remain readable next to the scannable QR.
-  page.drawLine({ start: { x: 58, y: 158 }, end: { x: width - 58, y: 158 }, thickness: 0.8, color: rgb(0.84, 0.86, 0.9) });
+  page.drawLine({ start: { x: 58, y: 158 }, end: { x: width - 58, y: 158 }, thickness: 0.8, color: rgb(0.19, 0.28, 0.41) });
   page.drawText("CERTIFICATE ID", { x: 60, y: 140, size: 7, font: sansBold, color: secondary });
   page.drawText(safe(sansBold, cert.certificateId), { x: 60, y: 124, size: 10, font: sansBold, color: bodyInk });
   page.drawText("VERIFY ONLINE", { x: 60, y: 105, size: 7, font: sansBold, color: secondary });
@@ -153,7 +143,7 @@ export async function renderCertificatePdf(cert: {
 
   const qr = await QRCode.toBuffer(cert.verificationUrl, { width: 260, margin: 1, errorCorrectionLevel: "M" });
   const qrImage = await pdf.embedPng(qr);
-  page.drawRectangle({ x: width - 137, y: 42, width: 78, height: 78, color: white, borderColor: rgb(0.84, 0.86, 0.9), borderWidth: 0.7 });
+  page.drawRectangle({ x: width - 137, y: 42, width: 78, height: 78, color: white, borderColor: rgb(0.49, 0.62, 0.8), borderWidth: 0.7 });
   page.drawImage(qrImage, { x: width - 132, y: 47, width: 68, height: 68 });
   const qrCaption = "SCAN TO VERIFY";
   page.drawText(qrCaption, {
@@ -261,14 +251,14 @@ export async function generateCertificate(certificateRowId: string, options: { f
   if (cert.status === "REVOKED") return;
 
   const branding = getBranding();
-  const config = (cert.template?.config ?? {}) as { primaryColor?: string; templateKey?: string };
+  const config = (cert.template?.config ?? {}) as { templateKey?: string };
   const issueDate = force ? cert.issueDate ?? new Date() : new Date();
   const disclaimer = await getSetting<string>("certificate_disclaimer", DEFAULT_DISCLAIMER);
   const bytes = await renderCertificatePdf({
     certificateId: cert.certificateId, verificationUrl: cert.verificationUrl, studentName: cert.snapshotStudentName,
     programTitle: cert.snapshotProgramTitle, domainName: cert.snapshotDomainName, duration: cert.snapshotDuration,
     completionDate: cert.completionDate, issueDate, companyName: branding.companyName,
-    primaryColor: config.primaryColor ?? branding.primaryColor, disclaimer: (disclaimer || DEFAULT_DISCLAIMER).replaceAll("{{companyName}}", branding.companyName),
+    disclaimer: (disclaimer || DEFAULT_DISCLAIMER).replaceAll("{{companyName}}", branding.companyName),
     difficulty: cert.projectDifficulty, templateKey: toTemplateKey(cert.template?.templateKey ?? config.templateKey),
   });
   const body = Buffer.from(bytes);
