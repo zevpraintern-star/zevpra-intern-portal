@@ -217,7 +217,8 @@ class S3StorageProvider implements StorageProvider {
         Body: object.body,
         ContentType: object.contentType,
         // Objects are private: access is only ever granted through a signed URL.
-        ACL: "private",
+        // R2 does not support ACLs, and modern S3 buckets may disable them.
+        // Bucket policy keeps objects private; downloads remain signed.
       }),
     );
   }
