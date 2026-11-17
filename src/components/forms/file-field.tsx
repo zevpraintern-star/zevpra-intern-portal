@@ -14,9 +14,9 @@ interface Uploaded { id: string; name: string; size: number }
  * on the server) and submits only the returned file ids with the form.
  */
 export function FileField({
-  label, name, purpose, accept = "image/png,image/jpeg,image/webp,application/pdf", multiple = false, required = false, hint,
+  label, name, purpose, accept = "image/png,image/jpeg,image/webp,application/pdf", multiple = false, required = false, hint, maxSizeBytes,
 }: {
-  label: string; name: string; purpose: string; accept?: string; multiple?: boolean; required?: boolean; hint?: string;
+  label: string; name: string; purpose: string; accept?: string; multiple?: boolean; required?: boolean; hint?: string; maxSizeBytes?: number;
 }) {
   const [files, setFiles] = useState<Uploaded[]>([]);
   const [busy, setBusy] = useState(false);
@@ -31,14 +31,26 @@ export function FileField({
       const added: Uploaded[] = [];
       for (const file of Array.from(list)) {
         const body = new FormData();
-        const compressed = await compressImageFile(file, {
-          maxDimension: 1280,
-          maxSizeBytes: 150 * 1024,
-        });
-        body.set("file", compressed.file);
+        let uploadFile = file;
+        if (file.type.startsWith("image/")) {
+          try {
+            const compressed = await compressImageFile(file, { maxDimension: 1280, maxSizeBytes: 150 * 1024 });
+            // Keep the original when compression cannot reduce the upload. The
+            // server still checks the real MIME, signature and purpose size cap.
+            if (compressed.bytes < file.size) uploadFile = compressed.file;
+          } catch {
+            // Some browsers cannot decode/encode every otherwise valid image.
+            // Let server-side validation decide whether the original is acceptable.
+          }
+        }
+        if (maxSizeBytes !== undefined && uploadFile.size > maxSizeBytes) {
+          throw new Error(`The file must be ${Math.floor(maxSizeBytes / 1024)} KB or smaller.`);
+        }
+        body.set("file", uploadFile);
         body.set("purpose", purpose);
         const response = await fetch("/api/uploads", { method: "POST", body });
-        const json = await response.json();
+        const json = await response.json().catch(() => null);
+        if (!json) throw new Error(`Upload service returned an unexpected response (HTTP ${response.status}).`);
         if (!json.success) throw new Error(json.error?.message ?? "Upload failed.");
         added.push({ id: json.data.fileId, name: json.data.name, size: json.data.size });
       }

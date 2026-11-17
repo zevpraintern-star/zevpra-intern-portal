@@ -22,7 +22,7 @@ export default async function AdminDashboard() {
         <Stat label="Active internships" value={t.activeInternships} />
         <Stat label="Completed internships" value={t.completedInternships} />
         {link("Pending submissions", t.pendingTaskSubmissions + t.pendingProjectReviews, "/admin/submissions", "tasks.review")}
-        <Stat label="Certificate-eligible, unpaid" value={t.eligibleNoCert} />
+        {link("Certificate-eligible, unpaid", t.eligibleNoCert, "/admin/payments?status=ELIGIBLE", "payments.view")}
         {link("Payments to verify", t.paymentsUnderReview, "/admin/payments", "payments.view")}
         {link("Issued certificates", t.issuedCertificates, "/admin/certificates", "certificates.issue")}
       </div>

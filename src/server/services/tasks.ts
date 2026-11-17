@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/api/errors";
 import { getPrisma } from "@/lib/db/prisma";
@@ -88,6 +89,7 @@ export async function submitTask(studentId: string, input: z.infer<typeof taskSu
     throw error;
   }
 
+  revalidatePath("/student", "layout");
   const user = await prisma.user.findUniqueOrThrow({ where: { id: studentId }, select: { email: true, name: true } });
   await notifyAndEmail({
     userId: studentId, email: user.email, recipientName: user.name ?? "Student", type: "SUBMISSION_RECEIVED",
@@ -107,26 +109,30 @@ export async function reviewTaskSubmission(actor: Actor, input: z.infer<typeof r
   });
   if (!submission) throw new NotFoundError("Submission not found.");
 
-  const claimed = await prisma.taskSubmission.updateMany({
-    where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
-    data: {
-      status: data.decision, feedback: data.feedback, reviewedById: actor.userId ?? null, reviewedAt: new Date(),
-      pointsAwarded: data.decision === "APPROVED" ? (data.pointsAwarded ?? submission.task.points) : (data.pointsAwarded ?? 0),
-    },
-  });
-  if (claimed.count === 0) throw new ConflictError("This submission was already reviewed.");
+  const { application, progress } = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.taskSubmission.updateMany({
+      where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
+      data: {
+        status: data.decision, feedback: data.feedback, reviewedById: actor.userId ?? null, reviewedAt: new Date(),
+        pointsAwarded: data.decision === "APPROVED" ? (data.pointsAwarded ?? submission.task.points) : (data.pointsAwarded ?? 0),
+      },
+    });
+    if (claimed.count === 0) throw new ConflictError("This submission was already reviewed.");
 
-  await prisma.taskAssignment.update({
-    where: { taskId_studentId: { taskId: submission.taskId, studentId: submission.studentId } },
-    data: data.decision === "APPROVED" ? { status: "COMPLETED", completedAt: new Date() } : { status: "IN_PROGRESS" },
+    await tx.taskAssignment.update({
+      where: { taskId_studentId: { taskId: submission.taskId, studentId: submission.studentId } },
+      data: data.decision === "APPROVED" ? { status: "COMPLETED", completedAt: new Date() } : { status: "IN_PROGRESS" },
+    });
+
+    const app = await tx.application.findFirst({
+      where: { studentId: submission.studentId, programId: submission.task.programId, status: "APPROVED" },
+      select: { id: true },
+    });
+    return { application: app, progress: app ? await refreshProgress(app.id, tx) : null };
   });
 
-  const application = await prisma.application.findFirst({
-    where: { studentId: submission.studentId, programId: submission.task.programId, status: "APPROVED" },
-    select: { id: true },
-  });
-  const progress = application ? await refreshProgress(application.id) : null;
-
+  revalidatePath("/student", "layout");
+  revalidatePath("/admin", "layout");
   await audit(actor, "SUBMISSION_REVIEWED", "TaskSubmission", submission.id, { decision: data.decision });
   const approved = data.decision === "APPROVED";
   const type = approved ? "SUBMISSION_APPROVED" : data.decision === "REJECTED" ? "SUBMISSION_REJECTED" : "SUBMISSION_CHANGES_REQUESTED";
@@ -137,5 +143,6 @@ export async function reviewTaskSubmission(actor: Actor, input: z.infer<typeof r
     templateKey: approved ? "submission_approved" : "submission_rejected",
     variables: { itemTitle: submission.task.title, feedback: data.feedback },
   });
+
   return { progress };
 }

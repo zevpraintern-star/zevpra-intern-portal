@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/api/errors";
@@ -136,6 +137,8 @@ export async function decideApplication(
   });
 
   const { application } = outcome;
+  revalidatePath("/student", "layout");
+  revalidatePath("/admin", "layout");
   await audit(actor, data.decision === "APPROVED" ? "APPLICATION_APPROVED" : "APPLICATION_REJECTED", "Application", application.id, {
     tasksAssigned: outcome.assigned,
     reason: data.reason,
@@ -183,6 +186,7 @@ export async function assignTaskToEnrolled(taskId: string): Promise<number> {
     skipDuplicates: true,
   });
   if (created.count > 0) {
+    revalidatePath("/student", "layout");
     for (const a of apps) {
       await notifyAndEmail({
         userId: a.studentId, email: a.student.email, recipientName: a.student.name ?? "Student",

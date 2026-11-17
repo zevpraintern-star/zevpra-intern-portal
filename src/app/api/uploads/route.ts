@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { ForbiddenError, PayloadTooLargeError, RateLimitError, UnauthenticatedError, UnsupportedMediaTypeError, ValidationError } from "@/lib/api/errors";
+import { ForbiddenError, InternalError, PayloadTooLargeError, RateLimitError, UnauthenticatedError, UnsupportedMediaTypeError, ValidationError } from "@/lib/api/errors";
 import { route } from "@/lib/api/handler";
 import { apiSuccess } from "@/lib/api/response";
 import { can, loadStaffContext } from "@/lib/auth/guards";
@@ -55,7 +55,7 @@ export const POST = route(async (req, _ctx, meta) => {
   // Payment screenshots are compressed in the browser before upload; the server still
   // enforces a hard cap so an uncompressed/forged upload can never slip through.
   if (purpose === "PAYMENT_SCREENSHOT" && body.byteLength > env.MAX_PAYMENT_SCREENSHOT_KB * 1024) {
-    throw new PayloadTooLargeError(`Payment screenshots must be under ${env.MAX_PAYMENT_SCREENSHOT_KB} KB after compression.`);
+    throw new PayloadTooLargeError(`Payment screenshots must be ${env.MAX_PAYMENT_SCREENSHOT_KB} KB or smaller.`);
   }
 
   // The declared type and extension are attacker-controlled: trust only the bytes.
@@ -66,7 +66,12 @@ export const POST = route(async (req, _ctx, meta) => {
   }
   if (purpose === "PAYMENT_QR" && !sniffed.startsWith("image/")) throw new UnsupportedMediaTypeError("The QR code must be an image.");
 
-  const asset = await saveUpload({ purpose, ownerUserId: ownerId, originalName: file.name, mimeType: sniffed, body, checksumSha256: createHash("sha256").update(body).digest("hex") });
+  let asset;
+  try {
+    asset = await saveUpload({ purpose, ownerUserId: ownerId, originalName: file.name, mimeType: sniffed, body, checksumSha256: createHash("sha256").update(body).digest("hex") });
+  } catch (error) {
+    throw new InternalError("We couldn't save the upload. Please try again; if the problem continues, contact support.", error);
+  }
   await enqueueJob("FILE_SCAN", { fileId: asset.id }, { dedupeKey: `scan:${asset.id}` });
   kickJobs();
   return apiSuccess({ fileId: asset.id, name: asset.originalName, size: asset.sizeBytes }, { status: 201 }) as NextResponse;

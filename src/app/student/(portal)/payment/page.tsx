@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireStudentPage } from "@/lib/auth/guards";
+import { getEnv } from "@/lib/config/env";
 import { getPrisma } from "@/lib/db/prisma";
 import { formatPrice } from "@/lib/utils/format";
 import { getPaymentView } from "@/server/services/payments";
@@ -54,7 +55,7 @@ export default async function PaymentPage({ searchParams }: { searchParams: Prom
               <input type="hidden" name="applicationId" value={app.id} />
               <TextField label="UTR / Transaction ID" name="utr" required autoComplete="off" placeholder="e.g. 412345678901" hint="8-30 letters or digits, exactly as shown in your UPI app." />
               <TextField label="Name on the payment (optional)" name="payerName" />
-              <FileField label="Payment screenshot" name="screenshotFileId" purpose="PAYMENT_SCREENSHOT" required hint="PNG, JPG, WEBP or PDF" />
+              <FileField label="Payment screenshot" name="screenshotFileId" purpose="PAYMENT_SCREENSHOT" required maxSizeBytes={getEnv().MAX_PAYMENT_SCREENSHOT_KB * 1024} hint={`PNG, JPG, WEBP or PDF. Maximum ${getEnv().MAX_PAYMENT_SCREENSHOT_KB} KB.`} />
               <TextArea label="Remarks (optional)" name="remarks" rows={2} />
               <CheckField name="amountConfirmed" label={`I paid exactly ${amount}`} />
               <SubmitButton pendingLabel="Submitting…">Submit for verification</SubmitButton>

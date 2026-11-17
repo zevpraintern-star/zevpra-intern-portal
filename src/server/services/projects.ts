@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/api/errors";
 import { getPrisma } from "@/lib/db/prisma";
@@ -158,13 +159,16 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
         update: {},
         create: { applicationId: application.id, studentId: submission.studentId, programId: application.programId, amount: payment.fee, currency: payment.currency },
       });
+    } else {
+      await refreshProgress(application.id, tx);
     }
     return true;
   });
   void claimed;
 
-  if (data.decision !== "APPROVED") await refreshProgress(application.id);
   const approved = data.decision === "APPROVED";
+  revalidatePath("/student", "layout");
+  revalidatePath("/admin", "layout");
   await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision });
   if (approved) await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id);
 

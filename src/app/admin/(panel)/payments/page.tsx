@@ -9,7 +9,7 @@ import { can, requireStaffPage } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
 import { formatDateTime, formatPrice } from "@/lib/utils/format";
 
-const TABS = ["UNDER_REVIEW", "APPROVED", "REJECTED", "NOT_SUBMITTED"] as const;
+const TABS = ["UNDER_REVIEW", "APPROVED", "REJECTED", "NOT_SUBMITTED", "ELIGIBLE"] as const;
 
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaffPage("payments.view");
@@ -17,9 +17,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const { page, size, skip, one } = parsePaging(params);
   const flash = one("flash");
   const status = (TABS as readonly string[]).includes(one("status") ?? "") ? (one("status") as (typeof TABS)[number]) : "UNDER_REVIEW";
+  const where = status === "ELIGIBLE"
+    ? { application: { certificateEligibleAt: { not: null } }, status: { not: "APPROVED" as const } }
+    : { status };
   const [rows, total] = await Promise.all([
-    getPrisma().paymentRequest.findMany({ where: { status }, orderBy: { submittedAt: "asc" }, skip, take: size, include: { student: { select: { name: true, email: true } }, program: { select: { title: true } } } }),
-    getPrisma().paymentRequest.count({ where: { status } }),
+    getPrisma().paymentRequest.findMany({ where, orderBy: { submittedAt: "asc" }, skip, take: size, include: { student: { select: { name: true, email: true } }, program: { select: { title: true } } } }),
+    getPrisma().paymentRequest.count({ where }),
   ]);
   return (
     <>
