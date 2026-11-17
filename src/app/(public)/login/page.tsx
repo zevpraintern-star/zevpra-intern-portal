@@ -109,7 +109,11 @@ export default function LoginPage() {
                     className="pl-10"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError(null);
+                      setInfo(null);
+                    }}
                   />
                 </div>
               </div>

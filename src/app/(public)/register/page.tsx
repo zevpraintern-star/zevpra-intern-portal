@@ -165,7 +165,11 @@ export default function RegisterPage() {
                         className="pl-10"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setError(null);
+                          setInfo(null);
+                        }}
                       />
                     </div>
                   </div>
