@@ -14,9 +14,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const student = await requireStudentPage();
   const { app } = await searchParams;
   const { active } = await getActiveApplication(student.userId, app);
-  const [pending, recent] = await Promise.all([
+  const [pending, recent, eligibleApplication] = await Promise.all([
     getPrisma().application.findFirst({ where: { studentId: student.userId, status: "PENDING" }, include: { program: { select: { title: true } } } }),
     getPrisma().notification.findMany({ where: { userId: student.userId }, orderBy: { createdAt: "desc" }, take: 4 }),
+    getPrisma().application.findFirst({
+      where: { studentId: student.userId, certificateEligibleAt: { not: null } },
+      orderBy: { certificateEligibleAt: "desc" },
+      select: { id: true, programId: true, certificateEligibleAt: true },
+    }),
   ]);
 
   if (!active) {
@@ -35,15 +40,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
 
   const progress = await computeProgress(active.id);
-  const payment = await getPrisma().paymentRequest.findUnique({ where: { studentId_programId: { studentId: student.userId, programId: active.programId } }, select: { status: true, certificate: { select: { status: true } } } });
-  const certStatus = payment?.certificate?.status ?? (active.certificateEligibleAt ? (payment?.status === "UNDER_REVIEW" ? "UNDER_REVIEW" : "ELIGIBLE") : "NOT_ELIGIBLE");
+  const payment = eligibleApplication
+    ? await getPrisma().paymentRequest.findUnique({ where: { studentId_programId: { studentId: student.userId, programId: eligibleApplication.programId } }, select: { status: true, certificate: { select: { status: true } } } })
+    : null;
+  const certStatus = payment?.certificate?.status ?? (eligibleApplication ? (payment?.status === "UNDER_REVIEW" ? "UNDER_REVIEW" : "ELIGIBLE") : "NOT_ELIGIBLE");
 
   let next = { label: "Open your tasks", href: "/student/tasks" };
   if (progress.tasksComplete && !progress.projectSelected) next = { label: "Choose your project", href: "/student/projects" };
   else if (progress.projectSelected && progress.projectStatus === null) next = { label: "Submit your GitHub repository", href: "/student/projects" };
   else if (progress.projectStatus === "CHANGES_REQUESTED" || progress.projectStatus === "REJECTED") next = { label: "Update your project", href: "/student/projects" };
-  else if (active.certificateEligibleAt && payment?.certificate?.status === "GENERATED") next = { label: "View your certificate", href: "/student/certificate" };
-  else if (active.certificateEligibleAt) next = { label: "Get your certificate", href: "/student/payment" };
+  else if (eligibleApplication && payment?.certificate?.status === "GENERATED") next = { label: "View your certificate", href: "/student/certificate" };
+  else if (eligibleApplication) next = { label: "Get your certificate", href: "/student/payment" };
 
   return (
     <>
