@@ -352,21 +352,16 @@
 .otp-tiles {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.55rem;
-  width: min(100%, 25rem);
+  grid-template-columns: repeat(6, minmax(0, 3.25rem));
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
   margin-inline: auto;
-  border-radius: 0.8rem;
-}
-
-.otp-tiles:focus-within {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
 }
 
 .otp-tile {
   display: grid;
-  aspect-ratio: 1;
+  height: 3.25rem;
   min-width: 0;
   place-items: center;
   border: 1px solid var(--border);
@@ -382,8 +377,7 @@
 
 .otp-tiles[data-focused="true"] .otp-tile[data-active="true"] {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 22%, transparent);
-  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--primary) 28%, transparent);
 }
 
 .otp-tiles[data-complete="true"] .otp-tile {
@@ -413,6 +407,13 @@
   opacity: 0;
 }
 
+.otp-tiles-input:focus,
+.otp-tiles-input:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
 .otp-tiles-input:disabled { cursor: wait; }
 
 .otp-tiles-status {
@@ -421,6 +422,11 @@
   color: var(--muted-foreground);
   text-align: center;
   font-size: 0.8rem;
+}
+
+@media (max-width: 420px) {
+  .otp-tiles { grid-template-columns: repeat(6, minmax(0, 2.75rem)); gap: 0.4rem; }
+  .otp-tile { height: 2.75rem; border-radius: 0.55rem; }
 }
 
 @keyframes otp-tile-pulse {
