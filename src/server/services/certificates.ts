@@ -104,7 +104,7 @@ export async function renderCertificatePdf(cert: {
   const title = "CERTIFICATE OF COMPLETION";
   const titleSize = Math.min(19, contentWidth / (serifBold.widthOfTextAtSize(title, 19) / 19));
   page.drawText(title, { x: contentLeft, y: height - 65, size: titleSize, font: serifBold, color: ink });
-  page.drawText(`VERIFIED LEARNING  -  ${cert.issueDate.getUTCFullYear()}`, { x: contentLeft, y: height - 43, size: 7.5, font: sans, color: rgb(0.2, 0.36, 0.62), characterSpacing: 1.2 });
+  page.drawText(`VERIFIED LEARNING  -  ${cert.issueDate.getUTCFullYear()}`, { x: contentLeft, y: height - 43, size: 7.5, font: sans, color: rgb(0.2, 0.36, 0.62) });
   page.drawRectangle({ x: contentRight - 92, y: height - 54, width: 92, height: 24, color: tierColor });
   const tierText = safe(sansBold, tier.label.toUpperCase());
   const tierSize = Math.min(7.5, 76 / Math.max(sansBold.widthOfTextAtSize(tierText, 7.5) / 7.5, 1));
