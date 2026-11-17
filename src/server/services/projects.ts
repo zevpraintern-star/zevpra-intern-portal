@@ -2,6 +2,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/api/errors";
+import { CERTIFICATE_MIN_SCORE_PERCENT } from "@/lib/config/constants";
 import { getPrisma } from "@/lib/db/prisma";
 import { projectSubmissionSchema, reviewDecisionSchema } from "@/lib/validation/submission";
 import { uuidSchema } from "@/lib/validation/common";
@@ -115,21 +116,29 @@ export async function submitProject(studentId: string, applicationId: string, in
 }
 
 /**
- * Project verification. Approval is what completes the internship and makes the
- * student certificate-eligible: one transaction, guarded so it can only happen once.
+ * Project verification completes the internship and calculates certificate eligibility
+ * from approved task and final project marks. Approval is status-guarded to run once.
  */
 export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeof reviewDecisionSchema>) {
   const data = reviewDecisionSchema.parse(input);
   const prisma = getPrisma();
   const submission = await prisma.projectSubmission.findUnique({
     where: { id: data.submissionId },
-    include: { project: { select: { id: true, title: true, programId: true } }, student: { select: { id: true, email: true, name: true } } },
+    include: { project: { select: { id: true, title: true, programId: true, maxScore: true } }, student: { select: { id: true, email: true, name: true } } },
   });
   if (!submission) throw new NotFoundError("Submission not found.");
+  if (data.score !== undefined && data.score > submission.project.maxScore) {
+    throw new ValidationError(`Project score cannot exceed ${submission.project.maxScore}.`, [{ field: "score", message: `Maximum score: ${submission.project.maxScore}.` }]);
+  }
+  if (data.decision === "APPROVED") {
+    if (data.score === undefined) {
+      throw new ValidationError("Enter the project score before approving.", [{ field: "score", message: "Project score is required for approval." }]);
+    }
+  }
 
   const application = await prisma.application.findFirst({
     where: { studentId: submission.studentId, programId: submission.project.programId, status: "APPROVED" },
-    select: { id: true, programId: true },
+    select: { id: true, programId: true, domainId: true },
   });
   if (!application) throw new NotFoundError("The student's application could not be found.");
   const claimed = await prisma.$transaction(async (tx) => {
@@ -139,7 +148,28 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
     });
     if (result.count === 0) throw new ConflictError("This submission was already reviewed.");
 
+    let scoreSummary: { percent: number; eligible: boolean } | null = null;
     if (data.decision === "APPROVED") {
+      const taskMarks = await tx.taskSubmission.findMany({
+        where: {
+          studentId: submission.studentId,
+          status: "APPROVED",
+          task: { programId: application.programId, OR: [{ domainId: null }, { domainId: application.domainId }] },
+        },
+        orderBy: [{ taskId: "asc" }, { attemptNumber: "desc" }],
+        select: { taskId: true, pointsAwarded: true, task: { select: { points: true } } },
+      });
+      const latestMarks = new Map<string, { earned: number; possible: number }>();
+      for (const mark of taskMarks) {
+        if (!latestMarks.has(mark.taskId)) latestMarks.set(mark.taskId, { earned: mark.pointsAwarded ?? 0, possible: mark.task.points });
+      }
+      const taskEarned = [...latestMarks.values()].reduce((sum, mark) => sum + mark.earned, 0);
+      const taskPossible = [...latestMarks.values()].reduce((sum, mark) => sum + mark.possible, 0);
+      const totalEarned = taskEarned + data.score!;
+      const totalPossible = taskPossible + submission.project.maxScore;
+      const eligible = totalPossible > 0 && totalEarned * 100 > totalPossible * CERTIFICATE_MIN_SCORE_PERCENT;
+      scoreSummary = { percent: totalPossible > 0 ? Number(((totalEarned / totalPossible) * 100).toFixed(2)) : 0, eligible };
+
       const now = new Date();
       await tx.internshipCompletion.upsert({
         where: { applicationId: application.id },
@@ -148,21 +178,26 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
       });
       await tx.application.update({
         where: { id: application.id },
-        data: { completionStatus: "COMPLETED", completedAt: now, certificateEligibleAt: now, certificateEligibleById: actor.userId ?? null, progressPercent: 100 },
+        data: {
+          completionStatus: "COMPLETED",
+          completedAt: now,
+          certificateEligibleAt: eligible ? now : null,
+          certificateEligibleById: eligible ? actor.userId ?? null : null,
+          progressPercent: 100,
+        },
       });
     } else {
       await refreshProgress(application.id, tx);
     }
-    return true;
+    return { scoreSummary };
   });
-  void claimed;
 
   const approved = data.decision === "APPROVED";
   revalidatePath("/student", "layout");
   revalidatePath("/admin", "layout");
   await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision });
-  if (approved) {
-    await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id, { free: true, awaitingAdminRelease: true });
+  if (approved && claimed.scoreSummary?.eligible) {
+    await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id, { free: true, awaitingAdminRelease: true, scorePercent: claimed.scoreSummary.percent });
   }
   if (approved) {
     await notifyAndEmail({
@@ -171,10 +206,17 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
       recipientName: submission.student.name ?? "Student",
       type: "SUBMISSION_APPROVED",
       title: "Final project approved",
-      body: "Your final project has been verified. An administrator will release your free certificate. We’ll notify you again when it is ready.",
+      body: claimed.scoreSummary?.eligible
+        ? `Your final project is approved. Your overall score is ${claimed.scoreSummary.percent}%, which qualifies for a free certificate. An administrator will release it; we will notify you when it is ready.`
+        : `Your final project is approved, but your overall score is ${claimed.scoreSummary?.percent ?? 0}%. Certificate eligibility requires a score greater than ${CERTIFICATE_MIN_SCORE_PERCENT}%.`,
       link: "/student/certificate",
       templateKey: "submission_approved",
-      variables: { itemTitle: submission.project.title, feedback: data.feedback || "Your free certificate will be released separately by an administrator." },
+      variables: {
+        itemTitle: submission.project.title,
+        feedback: `Overall score: ${claimed.scoreSummary?.percent ?? 0}%. ${claimed.scoreSummary?.eligible
+          ? "This meets the certificate threshold; an administrator will release your free certificate separately."
+          : `Certificate eligibility requires a score greater than ${CERTIFICATE_MIN_SCORE_PERCENT}%.`}${data.feedback ? ` Reviewer feedback: ${data.feedback}` : ""}`,
+      },
     });
   } else {
     await notifyAndEmail({

@@ -14,14 +14,16 @@ import { formatDate } from "@/lib/utils/format";
 export default async function CertificatePage({ searchParams }: { searchParams: Promise<{ flash?: string }> }) {
   const student = await requireStudentPage();
   const { flash } = await searchParams;
-  const [certs, eligibleApplications] = await Promise.all([
+  const [certs, completedApplications] = await Promise.all([
     getPrisma().certificate.findMany({ where: { studentId: student.userId }, orderBy: { createdAt: "desc" } }),
     getPrisma().application.findMany({
-      where: { studentId: student.userId, completionStatus: "COMPLETED", certificateEligibleAt: { not: null } },
+      where: { studentId: student.userId, completionStatus: "COMPLETED" },
       orderBy: { certificateEligibleAt: "desc" },
-      select: { id: true, program: { select: { title: true } } },
+      select: { id: true, certificateEligibleAt: true, program: { select: { title: true } } },
     }),
   ]);
+  const eligibleApplications = completedApplications.filter((application) => application.certificateEligibleAt !== null);
+  const belowThresholdApplications = completedApplications.filter((application) => application.certificateEligibleAt === null);
   const releasedCertificates = certs.filter((certificate) => certificate.status !== "PENDING");
   const awaitingRelease = eligibleApplications.filter((application) => !certs.some(
     (certificate) => certificate.applicationId === application.id && ["GENERATED", "REVOKED"].includes(certificate.status),
@@ -31,6 +33,7 @@ export default async function CertificatePage({ searchParams }: { searchParams: 
     <>
       <PageHeader title="Certificate" />
       <Flash flash={flash} />
+      {belowThresholdApplications.map((application) => <Card key={application.id} className="mb-4"><CardContent className="pt-6"><p className="font-semibold">{application.program.title}</p><p className="mt-1 text-sm text-muted-foreground">Certificate eligibility requires an overall score greater than 85% across graded tasks and the final project. This completed internship does not meet that threshold.</p></CardContent></Card>)}
       {awaitingRelease.map((application) => <Card key={application.id} className="mb-4"><CardContent className="pt-6"><p className="font-semibold">{application.program.title}</p><p className="mt-1 text-sm text-muted-foreground">Your final project is approved. An administrator will release your free certificate here. We’ll notify you by email and in the portal when it’s ready.</p></CardContent></Card>)}
       {releasedCertificates.length === 0 && awaitingRelease.length === 0 ? <EmptyState title="Not available yet">Your free certificate becomes available after your final project is approved and an administrator releases it.</EmptyState> : null}
       <div className="space-y-4">

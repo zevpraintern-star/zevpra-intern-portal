@@ -182,7 +182,7 @@ export async function saveTaskAction(_: ActionState, form: FormData): Promise<Ac
     const data = z.object({
       programId: z.string().uuid(), title: z.string().trim().min(3).max(200), description: z.string().trim().min(10).max(8000),
       difficulty: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]), submissionType: z.enum(["FILE", "GITHUB_LINK", "LIVE_URL", "TEXT", "MIXED"]),
-      maxAttempts: z.coerce.number().int().min(1).max(10), points: z.coerce.number().int().min(0).max(1000), sortOrder: z.coerce.number().int().min(0).max(10000),
+      maxAttempts: z.coerce.number().int().min(1).max(10), points: z.coerce.number().int().min(1).max(1000), sortOrder: z.coerce.number().int().min(0).max(10000),
       status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
     }).parse({ programId: str(form, "programId"), title: str(form, "title"), description: str(form, "description"), difficulty: str(form, "difficulty"), submissionType: str(form, "submissionType"), maxAttempts: str(form, "maxAttempts") ?? "3", points: str(form, "points") ?? "10", sortOrder: str(form, "sortOrder") ?? "0", status: str(form, "status") });
     const common = { ...data, domainId: str(form, "domainId") ?? null, instructions: str(form, "instructions"), requiresGithubLink: bool(form, "requiresGithubLink"), deadline: date(form, "deadline") };
@@ -249,8 +249,8 @@ export async function reviewProjectAction(_: ActionState, form: FormData): Promi
   return runAction(async () => {
     const { staff, actor } = await ctx("projects.review");
     const decision = str(form, "decision");
-    // Approving a project completes the internship and unlocks the certificate: that
-    // is a stronger power than leaving feedback, so it needs completions.review too.
+    // Approving a project completes the internship and calculates certificate eligibility,
+    // so it needs completions.review in addition to ordinary project review permission.
     if (decision === "APPROVED" && !can(staff, "completions.review")) throw new ForbiddenError("Only an administrator can approve a final project.");
     await reviewProjectSubmission(actor, { submissionId: str(form, "submissionId") as string, decision: decision as "APPROVED", feedback: str(form, "feedback") as string, score: num(form, "score") } as never);
     revalidatePath("/admin", "layout");

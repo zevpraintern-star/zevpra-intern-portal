@@ -108,13 +108,21 @@ export async function reviewTaskSubmission(actor: Actor, input: z.infer<typeof r
     include: { task: { select: { id: true, title: true, points: true, programId: true, domainId: true } }, student: { select: { id: true, email: true, name: true } } },
   });
   if (!submission) throw new NotFoundError("Submission not found.");
+  if (data.pointsAwarded !== undefined && data.pointsAwarded > submission.task.points) {
+    throw new ValidationError(`Task marks cannot exceed ${submission.task.points}.`, [{ field: "pointsAwarded", message: `Maximum marks: ${submission.task.points}.` }]);
+  }
+  if (data.decision === "APPROVED") {
+    if (data.pointsAwarded === undefined) {
+      throw new ValidationError("Enter the task marks before approving.", [{ field: "pointsAwarded", message: "Task marks are required for approval." }]);
+    }
+  }
 
   const { application, progress } = await prisma.$transaction(async (tx) => {
     const claimed = await tx.taskSubmission.updateMany({
       where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
       data: {
         status: data.decision, feedback: data.feedback, reviewedById: actor.userId ?? null, reviewedAt: new Date(),
-        pointsAwarded: data.decision === "APPROVED" ? (data.pointsAwarded ?? submission.task.points) : (data.pointsAwarded ?? 0),
+        pointsAwarded: data.decision === "APPROVED" ? data.pointsAwarded! : (data.pointsAwarded ?? 0),
       },
     });
     if (claimed.count === 0) throw new ConflictError("This submission was already reviewed.");

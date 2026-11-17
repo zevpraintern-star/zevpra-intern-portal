@@ -117,6 +117,9 @@ export const CERTIFICATE = {
   verificationPath: "/verify-certificate",
 } as const;
 
+/** Students must score strictly above this percentage across graded tasks and project. */
+export const CERTIFICATE_MIN_SCORE_PERCENT = 85;
+
 export const STUDENT_NAV = [
   { key: "dashboard", label: "Dashboard", href: "/student/dashboard" },
   { key: "profile", label: "My Profile", href: "/student/profile" },

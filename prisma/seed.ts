@@ -408,7 +408,7 @@ const FAQS: Array<{ question: string; answer: string; category: string; sortOrde
   {
     question: "What do I need to submit to complete an internship?",
     answer:
-      "You complete the assigned tasks, submit your project work, and finally submit your finished project as a public GitHub repository link from your dashboard. An administrator reviews that submission before you become certificate eligible.",
+      "You complete the assigned tasks, submit your project work, and finally submit your finished project as a public GitHub repository link from your dashboard. Your combined marks must be greater than 85% to qualify for certificate release.",
     category: "internship",
     sortOrder: 50,
   },

@@ -73,13 +73,11 @@ export default async function ProjectSubmissionReviewPage({
             <form action={async (formData) => {
               const decision = formData.get("decision") as "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
               const feedback = formData.get("feedback") as string;
-              const pointsAwarded = formData.get("pointsAwarded") as string;
               const score = formData.get("score") as string;
               await reviewProjectSubmission(staff, {
                 submissionId: submission.id,
                 decision,
                 feedback,
-                pointsAwarded: pointsAwarded ? Number(pointsAwarded) : undefined,
                 score: score ? Number(score) : undefined,
               });
               revalidatePath(`/admin/submissions/project/${submission.id}`);
@@ -102,13 +100,8 @@ export default async function ProjectSubmissionReviewPage({
               </div>
 
               <div className="grid gap-2 pt-2">
-                <label htmlFor="pointsAwarded" className="text-sm font-medium">Points awarded (optional)</label>
-                <input id="pointsAwarded" name="pointsAwarded" type="number" min={0} max={submission.project.maxScore ?? 100} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-              </div>
-
-              <div className="grid gap-2 pt-2">
-                <label htmlFor="score" className="text-sm font-medium">Score (optional)</label>
-                <input id="score" name="score" type="number" min={0} max={submission.project.maxScore ?? 100} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                <label htmlFor="score" className="text-sm font-medium">Project marks (required to approve; max {submission.project.maxScore})</label>
+                <input id="score" name="score" type="number" min={0} max={submission.project.maxScore} step={1} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
 
               <div className="flex gap-2">

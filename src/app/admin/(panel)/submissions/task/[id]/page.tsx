@@ -34,7 +34,7 @@ export default async function ReviewTask({ params }: { params: Promise<{ id: str
             <ActionForm action={reviewTaskAction}><input type="hidden" name="submissionId" value={s.id} />
               <SelectField label="Decision" name="decision" options={[{ value: "APPROVED", label: "Approve" }, { value: "CHANGES_REQUESTED", label: "Request changes" }, { value: "REJECTED", label: "Reject" }]} />
               <TextArea label="Feedback for the student" name="feedback" rows={5} required hint="Shared with the student by email and in the portal." />
-              <TextField label={`Points (max ${s.task.points})`} name="pointsAwarded" type="number" min={0} max={s.task.points} />
+              <TextField label={`Task marks (required to approve; max ${s.task.points})`} name="pointsAwarded" type="number" min={0} max={s.task.points} step={1} />
               <SubmitButton>Save review</SubmitButton></ActionForm>)}
         </CardContent></Card>
       </div>

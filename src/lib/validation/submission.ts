@@ -65,7 +65,7 @@ export type ProjectSubmissionInput = z.infer<typeof projectSubmissionSchema>;
 
 /**
  * Final internship completion hand-in. This is what an administrator reviews
- * before a student becomes certificate eligible; the GitHub link is mandatory.
+ * before a student can complete an internship; the GitHub link is mandatory.
  */
 export const completionSubmissionSchema = z.object({
   applicationId: uuidSchema,

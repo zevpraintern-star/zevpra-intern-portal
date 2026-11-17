@@ -32,7 +32,7 @@ export default async function ProjectsAdmin({ searchParams }: { searchParams: Pr
           <TextArea label="Description" name="description" defaultValue={p?.description} rows={4} required className="md:col-span-2" />
           <TextArea label="Requirements (one per line)" name="requirements" defaultValue={p?.requirements.join("\n")} rows={4} />
           <TextArea label="Skills (one per line)" name="skills" defaultValue={p?.skills.join("\n")} rows={4} />
-          <TextField label="Max score" name="maxScore" type="number" min={1} defaultValue={p?.maxScore ?? 100} />
+          <TextField label="Maximum project marks" name="maxScore" type="number" min={1} max={1000} step={1} defaultValue={p?.maxScore ?? 100} />
           <TextField label="Order" name="sortOrder" type="number" min={0} defaultValue={p?.sortOrder ?? 0} />
           <SelectField label="Status" name="status" defaultValue={p?.status ?? "DRAFT"} options={["DRAFT", "PUBLISHED", "ARCHIVED"].map((v) => ({ value: v, label: v.toLowerCase() }))} />
           <CheckField name="requiresLiveUrl" label="Require a live URL" defaultChecked={p?.requiresLiveUrl} />

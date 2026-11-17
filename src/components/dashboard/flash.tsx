@@ -12,7 +12,7 @@ const MESSAGES: Record<string, string> = {
   project_submitted: "Project submitted for verification.",
   application_reviewed: "Decision recorded and the student was notified.",
   task_reviewed: "Review saved and the student was notified.",
-  project_approved: "Project verified. The student is now certificate-eligible.",
+  project_approved: "Project verified. Certificate eligibility requires an overall score above 85%.",
   project_reviewed: "Review saved and the student was notified.",
   certificate_released: "Certificate released. The student was notified by email and in the portal.",
   certificate_release_queued: "Certificate release is queued. The student will be notified when it is ready.",

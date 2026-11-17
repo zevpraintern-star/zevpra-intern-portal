@@ -66,13 +66,11 @@ export default async function TaskSubmissionReviewPage({
               const decision = formData.get("decision") as "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
               const feedback = formData.get("feedback") as string;
               const pointsAwarded = formData.get("pointsAwarded") as string;
-              const score = formData.get("score") as string;
               await reviewTaskSubmission(staff, {
                 submissionId: subject.id,
                 decision,
                 feedback,
                 pointsAwarded: pointsAwarded ? Number(pointsAwarded) : undefined,
-                score: score ? Number(score) : undefined,
               });
               revalidatePath(`/admin/submissions/task/${subject.id}`);
               redirect(`/admin/submissions/task/${subject.id}?flash=reviewed`);
@@ -94,13 +92,8 @@ export default async function TaskSubmissionReviewPage({
               </div>
 
               <div className="grid gap-2 pt-2">
-                <label htmlFor="pointsAwarded" className="text-sm font-medium">Points awarded (optional)</label>
-                <input id="pointsAwarded" name="pointsAwarded" type="number" min={0} max={subject.task.points} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-              </div>
-
-              <div className="grid gap-2 pt-2">
-                <label htmlFor="score" className="text-sm font-medium">Score (optional)</label>
-                <input id="score" name="score" type="number" min={0} max={subject.task.points} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                <label htmlFor="pointsAwarded" className="text-sm font-medium">Task marks (required to approve; max {subject.task.points})</label>
+                <input id="pointsAwarded" name="pointsAwarded" type="number" min={0} max={subject.task.points} step={1} className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
 
               <div className="flex gap-2">

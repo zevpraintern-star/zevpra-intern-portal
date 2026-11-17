@@ -48,12 +48,12 @@ export const JOURNEY_STEPS: readonly JourneyStep[] = [
     title: "Submit and get verified",
     summary: "Share your repository link for mentor review.",
     detail:
-      "A reviewer checks the project. When it is approved, your internship is complete and you become eligible for a certificate.",
+      "A reviewer checks the project. Your overall score across approved tasks and the project must be greater than 85% to qualify for a free certificate. An administrator releases qualifying certificates.",
   },
   {
     icon: "certificate",
     title: "Get your certificate",
-    summary: "Your digital certificate is free when your project is approved.",
+    summary: "Qualify with a score above 85%, then an administrator releases your free certificate.",
     detail:
       "Once your final project is approved, your certificate is prepared automatically at no cost.",
   },

@@ -16,6 +16,7 @@ export default async function FaqPage() {
   const faqs = [
     ...storedFaqs.filter((faq) => !/payment|fee|upi|transaction|refund/i.test(`${faq.question} ${faq.answer}`)),
     { id: "free-certificates", question: "Are certificates free?", answer: "Yes. Digital certificates are free after your final project is approved." },
+    { id: "certificate-score", question: "What score do I need for a certificate?", answer: "Your combined score across approved tasks and the final project must be greater than 85%. An administrator releases certificates for students who meet this requirement." },
   ];
   return (
     <>

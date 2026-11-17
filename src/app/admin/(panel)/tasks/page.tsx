@@ -38,7 +38,7 @@ export default async function TasksAdmin({ searchParams }: { searchParams: Promi
           <SelectField label="Submission type" name="submissionType" defaultValue={t?.submissionType ?? "GITHUB_LINK"} options={["GITHUB_LINK", "LIVE_URL", "TEXT", "FILE", "MIXED"].map((v) => ({ value: v, label: v.replace("_", " ").toLowerCase() }))} />
           <TextField label="Deadline" name="deadline" type="datetime-local" defaultValue={localInput(t?.deadline)} />
           <TextField label="Maximum attempts" name="maxAttempts" type="number" min={1} max={10} defaultValue={t?.maxAttempts ?? 3} />
-          <TextField label="Points" name="points" type="number" min={0} defaultValue={t?.points ?? 10} />
+          <TextField label="Maximum task marks" name="points" type="number" min={1} max={1000} step={1} defaultValue={t?.points ?? 10} />
           <TextField label="Order" name="sortOrder" type="number" min={0} defaultValue={t?.sortOrder ?? 0} />
           <SelectField label="Status" name="status" defaultValue={t?.status ?? "DRAFT"} options={["DRAFT", "PUBLISHED", "ARCHIVED"].map((v) => ({ value: v, label: v.toLowerCase() }))} />
           <CheckField name="requiresGithubLink" label="Require a GitHub link" defaultChecked={t?.requiresGithubLink} />

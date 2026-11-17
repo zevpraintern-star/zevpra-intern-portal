@@ -48,7 +48,7 @@ export default async function ReviewProject({ params }: { params: Promise<{ id: 
               {!canApprove ? <Alert>You can leave feedback. Only an administrator can approve a final project.</Alert> : null}
               <SelectField label="Decision" name="decision" options={options} />
               <TextArea label="Feedback for the student" name="feedback" rows={5} required />
-              <TextField label={`Score (max ${s.project.maxScore})`} name="score" type="number" min={0} max={s.project.maxScore} />
+              <TextField label={`Project marks (required to approve; max ${s.project.maxScore})`} name="score" type="number" min={0} max={s.project.maxScore} step={1} hint="Certificate eligibility requires an overall score greater than 85% across graded tasks and this project." />
               <SubmitButton>Save decision</SubmitButton></ActionForm>)}{hardTierEnabled && s.project.difficulty === "ADVANCED" ? (
            <details className="pt-3"><summary className="cursor-pointer text-xs text-primary/80">Hard-tier reviewer checklist ({HARD_REVIEW_CHECKLIST.length} items)</summary>
              <ul className="mt-2 space-y-1 border-t text-xs text-muted-foreground">
