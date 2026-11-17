@@ -13,7 +13,7 @@ export async function dashboardMetrics() {
 
   const [
     totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships,
-    pendingTaskSubmissions, pendingProjectReviews, eligibleNoCert, paymentsUnderReview, issuedCertificates,
+    pendingTaskSubmissions, pendingProjectReviews, certificatesToPrepare, issuedCertificates,
     emailsSentToday,
   ] = await Promise.all([
     prisma.studentProfile.count(),
@@ -24,8 +24,7 @@ export async function dashboardMetrics() {
     prisma.application.count({ where: { completionStatus: "COMPLETED" } }),
     prisma.taskSubmission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
     prisma.projectSubmission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
-    prisma.application.count({ where: { certificateEligibleAt: { not: null }, paymentRequests: { none: { status: "APPROVED" } } } }),
-    prisma.paymentRequest.count({ where: { status: "UNDER_REVIEW" } }),
+    prisma.application.count({ where: { certificateEligibleAt: { not: null }, certificates: { none: {} } } }),
     prisma.certificate.count({ where: { status: "GENERATED" } }),
     prisma.emailLog.count({ where: { status: "SENT", sentAt: { gte: sinceMidnight } } }),
   ]);
@@ -34,10 +33,9 @@ export async function dashboardMetrics() {
   const registrations = await prisma.$queryRaw<Array<{ day: Date; count: bigint }>>(
     Prisma.sql`SELECT date_trunc('day', created_at) AS day, count(*)::bigint AS count FROM student_profiles WHERE created_at >= ${since30} GROUP BY 1 ORDER BY 1`,
   );
-  const [byDomainRaw, completionRaw, paymentsRaw, domains] = await Promise.all([
+  const [byDomainRaw, completionRaw, domains] = await Promise.all([
     prisma.application.groupBy({ by: ["domainId"], _count: { _all: true }, orderBy: { _count: { domainId: "desc" } }, take: 8 }),
     prisma.application.groupBy({ by: ["completionStatus"], where: { status: "APPROVED" }, _count: { _all: true } }),
-    prisma.paymentRequest.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.domain.findMany({ select: { id: true, name: true } }),
   ]);
   const names = new Map(domains.map((d) => [d.id, d.name]));
@@ -50,13 +48,12 @@ export async function dashboardMetrics() {
   }
 
   return {
-    totals: { totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships, pendingTaskSubmissions, pendingProjectReviews, eligibleNoCert, paymentsUnderReview, issuedCertificates,
+    totals: { totalStudents, new7, new30, pendingApplications, activeInternships, completedInternships, pendingTaskSubmissions, pendingProjectReviews, certificatesToPrepare, issuedCertificates,
     emailQuota: { sent: emailsSentToday, limit: getEnv().BREVO_DAILY_LIMIT },
     },
     registrations: days,
     byDomain: byDomainRaw.map((r) => ({ label: names.get(r.domainId) ?? "Unknown", value: r._count._all })),
     completion: completionRaw.map((r) => ({ label: r.completionStatus, value: r._count._all })),
-    payments: paymentsRaw.map((r) => ({ label: r.status, value: r._count._all })),
   };
 }
 

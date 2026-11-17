@@ -11,7 +11,6 @@ import { Marquee } from "@/components/motion/marquee";
 import { ScrollProgress } from "@/components/motion/scroll-progress";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { getBranding } from "@/lib/config/branding";
-import { formatPrice } from "@/lib/utils/format";
 import { getDomainGroups } from "@/server/queries/domains";
 
 /**
@@ -42,7 +41,6 @@ const BENEFITS = [
 export default async function HomePage() {
   const branding = getBranding();
   const groups = await getDomainGroups();
-  const fee = formatPrice(branding.certificateFee, branding.currency);
 
   return (
     <>
@@ -51,7 +49,7 @@ export default async function HomePage() {
       <WorldCanvas />
 
       <div className="relative z-10">
-        <Hero fee={fee} />
+        <Hero />
 
         <Marquee
           items={[...BENEFITS, ...groups.map((group) => group.name)]}
@@ -59,18 +57,17 @@ export default async function HomePage() {
         />
 
         <DomainPanels groups={groups} />
-        <Journey fee={fee} />
+        <Journey />
 
         <div data-stage="certificate">
           <CertificateShowcase
             companyName={branding.companyName}
             domain={branding.domain}
-            fee={fee}
           />
           <Assurances />
         </div>
 
-        <FinalCta fee={fee} />
+        <FinalCta />
       </div>
     </>
   );

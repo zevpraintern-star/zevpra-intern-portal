@@ -93,7 +93,7 @@ function SampleCertificate({ companyName, domain }: { companyName: string; domai
 
 const FACTS = [
   "Every certificate has a public verification page and a QR code.",
-  "The page shows only the name, internship, domain and issue date. Contact and payment details stay private.",
+  "The public page shows certificate details without exposing private student contact information.",
   "A certificate can be revoked, and the verification page will say so.",
   "It confirms completion of our own program. It is not a government or university credential.",
 ] as const;
@@ -101,11 +101,9 @@ const FACTS = [
 export function CertificateShowcase({
   companyName,
   domain,
-  fee,
 }: {
   companyName: string;
   domain: string;
-  fee: string;
 }) {
   return (
     <section aria-labelledby="certificate-heading" className="relative py-[14vh]">
@@ -118,8 +116,8 @@ export function CertificateShowcase({
             A certificate anyone can check.
           </h2>
           <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Finish the internship for free. If you want a certificate, it costs {fee}, paid by UPI
-            and verified by a person before it is issued.
+            Complete the internship and get a verified digital certificate for free after your
+            final project is approved.
           </p>
           <ul className="mt-8 space-y-3">
             {FACTS.map((fact) => (

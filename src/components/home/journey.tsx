@@ -21,7 +21,6 @@ import { useRef, useState } from "react";
 
 import {
   JOURNEY_STEPS,
-  withFee,
   type JourneyIcon,
 } from "@/lib/content/journey";
 import { JOURNEY_SLOTS } from "@/components/3d/world-state";
@@ -44,7 +43,7 @@ export const JOURNEY_ICONS: Record<JourneyIcon, LucideIcon> = {
  * the camera is passing gate N. A complete, ordered version of the content is kept
  * in the DOM for screen readers and search engines.
  */
-export function Journey({ fee }: { fee: string }) {
+export function Journey() {
   const ref = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
@@ -70,7 +69,7 @@ export function Journey({ fee }: { fee: string }) {
       <ol className="sr-only">
         {JOURNEY_STEPS.map((s) => (
           <li key={s.title}>
-            {s.title}. {withFee(s.summary, fee)} {s.detail}
+            {s.title}. {s.summary} {s.detail}
           </li>
         ))}
       </ol>
@@ -131,7 +130,7 @@ export function Journey({ fee }: { fee: string }) {
                     {step.title}
                   </h3>
                   <p className="mt-2 text-base font-medium text-foreground/90">
-                    {withFee(step.summary, fee)}
+                    {step.summary}
                   </p>
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
                     {step.detail}

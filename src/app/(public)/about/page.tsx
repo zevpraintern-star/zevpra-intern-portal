@@ -1,13 +1,10 @@
 import { PageHero } from "@/components/layout/page-hero";
 import { Reveal } from "@/components/motion/reveal";
-import { getBranding } from "@/lib/config/branding";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, Target, HeartHandshake, BookOpen } from "lucide-react";
 
 export default function AboutPage() {
-  const branding = getBranding();
-
   return (
     <>
       <PageHero
@@ -36,7 +33,7 @@ export default function AboutPage() {
             <CardTitle>100% Free Learning & Submissions</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground leading-relaxed">
-            Joining our tracks, working on modules, receiving task feedback, and submitting your final GitHub repository is entirely free. A nominal fee of {branding.currency} {branding.certificateFee} is charged only if you request a manual-verified digital certificate to cover processing costs.
+            Joining our tracks, working on modules, receiving task feedback, submitting your final GitHub repository, and receiving a digital certificate after project approval are all free.
           </CardContent>
         </Card>
       </Reveal>

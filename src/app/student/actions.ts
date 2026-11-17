@@ -13,7 +13,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { githubProfileUrlSchema } from "@/lib/validation/common";
 import { studentRegistrationSchema } from "@/lib/validation/student";
 import { applyToProgram, withdrawApplication } from "@/server/services/applications";
-import { submitPaymentProof } from "@/server/services/payments";
+import { issueFreeCertificate } from "@/server/services/certificates";
 import { selectProject, submitProject } from "@/server/services/projects";
 import { submitTask } from "@/server/services/tasks";
 import { markAllRead, markRead } from "@/server/services/notifications";
@@ -74,15 +74,13 @@ export async function submitProjectAction(_: ActionState, form: FormData): Promi
   });
 }
 
-export async function submitPaymentAction(_: ActionState, form: FormData): Promise<ActionState> {
+export async function issueFreeCertificateAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
     const { student, actor } = await context();
-    await submitPaymentProof(student.userId, {
-      applicationId: str(form, "applicationId") as string, utr: str(form, "utr") as string, payerName: str(form, "payerName"),
-      remarks: str(form, "remarks"), screenshotFileId: strList(form, "screenshotFileId")[0] as string, amountConfirmed: bool(form, "amountConfirmed") as true,
-    } as never, actor);
+    const applicationId = z.string().uuid().parse(str(form, "applicationId"));
+    await issueFreeCertificate(student.userId, applicationId, actor);
     revalidatePath("/student", "layout");
-    redirect("/student/payment?flash=payment_submitted");
+    redirect("/student/certificate?flash=certificate_processing");
   });
 }
 

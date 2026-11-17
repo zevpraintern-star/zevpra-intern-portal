@@ -3,7 +3,6 @@
  * flight, the /how-it-works timeline and the screen-reader outline, so the copy can
  * never drift between them.
  *
- * `{fee}` is replaced with the configured certificate fee at render time.
  */
 
 export type JourneyIcon = "mail" | "compass" | "tasks" | "project" | "verify" | "certificate";
@@ -54,12 +53,8 @@ export const JOURNEY_STEPS: readonly JourneyStep[] = [
   {
     icon: "certificate",
     title: "Get your certificate",
-    summary: "The internship is free. The certificate is {fee}, and optional.",
+    summary: "Your digital certificate is free when your project is approved.",
     detail:
-      "Pay by UPI, then submit your UTR and a payment screenshot. An administrator verifies the payment before your certificate is issued.",
+      "Once your final project is approved, your certificate is prepared automatically at no cost.",
   },
 ] as const;
-
-export function withFee(text: string, fee: string): string {
-  return text.replaceAll("{fee}", fee);
-}

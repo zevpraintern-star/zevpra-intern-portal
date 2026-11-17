@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getBranding } from "@/lib/config/branding";
 import { getPrisma } from "@/lib/db/prisma";
-import { formatPrice } from "@/lib/utils/format";
-import { getPaymentSettings } from "@/server/services/settings";
 
 export const revalidate = 600;
 
@@ -32,8 +30,6 @@ export default async function InternshipDetail({ params }: { params: Promise<{ s
   const p = await load((await params).slug);
   if (!p) notFound();
   const branding = getBranding();
-  const pay = await getPaymentSettings().catch(() => null);
-  const fee = formatPrice(pay?.fee ?? branding.certificateFee, pay?.currency ?? branding.currency);
   const list = (title: string, items: string[]) => items.length ? (<section><h2 className="font-display text-xl font-semibold">{title}</h2><ul className="mt-3 list-disc space-y-1.5 pl-5 text-muted-foreground">{items.map((i) => <li key={i}>{i}</li>)}</ul></section>) : null;
   return (
     <>
@@ -53,7 +49,7 @@ export default async function InternshipDetail({ params }: { params: Promise<{ s
           <dl className="mt-4 space-y-3">
             <div><dt className="text-muted-foreground">Tasks</dt><dd className="font-medium">{p._count.tasks}</dd></div>
             <div><dt className="text-muted-foreground">Fee</dt><dd className="font-medium">Free</dd></div>
-            <div><dt className="text-muted-foreground">Certificate</dt><dd className="font-medium">{fee}, optional</dd></div>
+            <div><dt className="text-muted-foreground">Certificate</dt><dd className="font-medium">Free digital certificate after project approval</dd></div>
             {p.certificateRequirements ? <div><dt className="text-muted-foreground">To earn it</dt><dd>{p.certificateRequirements}</dd></div> : null}
           </dl>
         </aside>

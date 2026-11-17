@@ -127,7 +127,6 @@ export const STUDENT_NAV = [
   { key: "progress", label: "Progress", href: "/student/progress" },
   { key: "announcements", label: "Announcements", href: "/student/announcements" },
   { key: "certificate", label: "Certificate", href: "/student/certificate" },
-  { key: "payment", label: "Payment", href: "/student/payment" },
   { key: "notifications", label: "Notifications", href: "/student/notifications" },
   { key: "settings", label: "Settings", href: "/student/settings" },
 ] as const;

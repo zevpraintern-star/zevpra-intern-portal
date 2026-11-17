@@ -5,14 +5,18 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { getPrisma } from "@/lib/db/prisma";
 
 export const revalidate = 600;
-export const metadata: Metadata = { title: "FAQ", description: "Answers about our free internships and the optional certificate.", alternates: { canonical: "/faq" } };
+export const metadata: Metadata = { title: "FAQ", description: "Answers about our free internships and certificates.", alternates: { canonical: "/faq" } };
 
 async function load() {
   try { return await getPrisma().faq.findMany({ where: { isPublished: true }, orderBy: [{ category: "asc" }, { sortOrder: "asc" }] }); } catch { return []; }
 }
 
 export default async function FaqPage() {
-  const faqs = await load();
+  const storedFaqs = await load();
+  const faqs = [
+    ...storedFaqs.filter((faq) => !/payment|fee|upi|transaction|refund/i.test(`${faq.question} ${faq.answer}`)),
+    { id: "free-certificates", question: "Are certificates free?", answer: "Yes. Digital certificates are free after your final project is approved." },
+  ];
   return (
     <>
       {faqs.length > 0 ? <JsonLd data={{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.question, acceptedAnswer: { "@type": "Answer", text: f.answer } })) }} /> : null}

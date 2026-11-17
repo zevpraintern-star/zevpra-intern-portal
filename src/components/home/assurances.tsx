@@ -5,8 +5,8 @@ import { Reveal } from "@/components/motion/reveal";
 const ITEMS = [
   {
     icon: ShieldCheck,
-    title: "Manual UPI verification",
-    body: "There is no payment gateway. You pay by UPI, submit your UTR and screenshot, and an administrator checks it before anything is issued.",
+    title: "Free digital certificates",
+    body: "Complete the required tasks and get your final project approved to receive a digital certificate at no cost.",
   },
   {
     icon: GitBranch,

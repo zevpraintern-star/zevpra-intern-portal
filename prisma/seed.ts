@@ -246,16 +246,8 @@ const DOMAIN_CATEGORIES: Array<{
 ];
 
 // ---------------------------------------------------------------------------
-// Runtime configuration (admin editable) - payment values are NEVER hardcoded
+// Runtime configuration (admin editable)
 // ---------------------------------------------------------------------------
-
-const DEFAULT_PAYMENT_INSTRUCTIONS = [
-  "Complete the certificate fee payment using any UPI application.",
-  "Take a clear screenshot of the successful payment.",
-  "Enter your UTR / Transaction ID exactly as shown in your UPI app.",
-  "Upload the screenshot and submit it for verification.",
-  "Your payment is reviewed manually by an administrator. A certificate is generated only after the payment is approved.",
-].join("\n");
 
 const DEFAULT_CERTIFICATE_DISCLAIMER =
   "This certificate confirms participation in and completion of an online internship program offered by {{companyName}}. It is not a government, university, UGC or AICTE approved credential, and it is not a guarantee of employment.";
@@ -277,14 +269,6 @@ const APP_SETTINGS: Array<{
     description: "When on, only security- and outcome-critical emails are sent; every other event stays an in-app notification.",
   },
   {
-    key: "certificate_fee",
-    value: Number(process.env.CERTIFICATE_FEE ?? 50),
-    valueType: "NUMBER",
-    category: "payments",
-    label: "Certificate fee",
-    description: "Optional certificate fee in the configured currency.",
-  },
-  {
     key: "hard_tier_enabled",
     value: false,
     valueType: "BOOLEAN",
@@ -293,43 +277,6 @@ const APP_SETTINGS: Array<{
     description: "When off, the Hard difficulty tier and hard-tier certificate template are unavailable.",
   },
 
-  {
-    key: "currency",
-    value: process.env.CURRENCY ?? "INR",
-    valueType: "STRING",
-    category: "payments",
-    label: "Currency",
-  },
-  {
-    key: "upi_id",
-    value: process.env.UPI_ID ?? "",
-    valueType: "STRING",
-    category: "payments",
-    label: "UPI ID",
-    description: "UPI VPA shown to students on the certificate payment page.",
-  },
-  {
-    key: "upi_payee_name",
-    value: process.env.UPI_PAYEE_NAME ?? "",
-    valueType: "STRING",
-    category: "payments",
-    label: "UPI payee name",
-  },
-  {
-    key: "upi_qr_file_id",
-    value: null,
-    valueType: "JSON",
-    category: "payments",
-    label: "UPI QR code file reference",
-    description: "FileAsset id of the uploaded QR code image. Never a public URL.",
-  },
-  {
-    key: "payment_instructions",
-    value: DEFAULT_PAYMENT_INSTRUCTIONS,
-    valueType: "STRING",
-    category: "payments",
-    label: "Payment instructions",
-  },
   {
     key: "certificate_disclaimer",
     value: DEFAULT_CERTIFICATE_DISCLAIMER,
@@ -427,7 +374,7 @@ const HOMEPAGE_SECTIONS: Array<{
     key: "certificate",
     title: "Verified certificates",
     subtitle:
-      "Optional certificate with a public verification page and QR code. The fee is shown before payment.",
+      "Free digital certificate after your final project is approved, with a public verification page and QR code.",
     sortOrder: 80,
   },
   { key: "faq", title: "Frequently asked questions", sortOrder: 90 },
@@ -452,25 +399,11 @@ const FAQS: Array<{ question: string; answer: string; category: string; sortOrde
     sortOrder: 10,
   },
   {
-    question: "What is the certificate fee for?",
+    question: "Are certificates free?",
     answer:
-      "The certificate is optional. Students who complete the program and want a certificate pay a one-time certificate fee that covers generation, verification hosting and issue records. The current fee is displayed on the certificate payment page and is configured by the administrator.",
+      "Yes. Digital certificates are free after your final project is approved.",
     category: "certificate",
     sortOrder: 20,
-  },
-  {
-    question: "Is there an online payment gateway?",
-    answer:
-      "No. Payments are made directly through UPI. After paying, you upload a screenshot and your UTR / transaction ID, and an administrator verifies the payment manually before any certificate is generated.",
-    category: "certificate",
-    sortOrder: 30,
-  },
-  {
-    question: "Does uploading a payment screenshot generate my certificate?",
-    answer:
-      "No. Uploading a screenshot only moves your payment to 'under review'. A certificate is generated only after an administrator approves the payment.",
-    category: "certificate",
-    sortOrder: 40,
   },
   {
     question: "What do I need to submit to complete an internship?",
@@ -646,11 +579,11 @@ const EMAIL_TEMPLATES: SeedEmailTemplate[] = [
       [
         "Hello {{recipientName}},",
         "You are eligible for a {{programTitle}} certificate.",
-        "The certificate is optional and costs {{certificateFee}} {{currency}}. You can pay by UPI and upload your payment proof from your dashboard.",
+        "Your digital certificate is free. It will be prepared after your final project is approved.",
       ],
       "Open certificate section",
     ),
-    text: "You are eligible for a {{programTitle}} certificate. Fee: {{certificateFee}} {{currency}}.",
+    text: "Your {{programTitle}} digital certificate is free and will be prepared after your final project is approved.",
   },
   {
     key: "payment_submitted",
@@ -688,9 +621,9 @@ const EMAIL_TEMPLATES: SeedEmailTemplate[] = [
         "Hello {{recipientName}},",
         "We could not verify your payment proof.",
         "Reason: {{reason}}",
-        "You can correct the details and submit again from your dashboard.",
+        "Certificate payments are no longer accepted. Please contact support if you need help with a payment made before this change.",
       ],
-      "Open payment section",
+      "Contact support",
     ),
     text: "Payment proof could not be verified. Reason: {{reason}}",
   },
@@ -904,7 +837,7 @@ async function main(attempt = 1): Promise<void> {
               "Complete three practical, reviewable tasks",
               `Build a ${track.label.toLowerCase()}-level capstone project`,
             ],
-            certificateRequirements: "Complete the required tasks and have the final project verified. Certificate is optional.",
+            certificateRequirements: "Complete the required tasks and have the final project approved to receive your free digital certificate.",
             isFree: true,
             status: "PUBLISHED",
             isFeatured: false,

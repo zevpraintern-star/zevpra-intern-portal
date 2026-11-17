@@ -12,7 +12,6 @@ import { actorOf, can, requireStaff } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
 import { hashPassword, verifyPassword } from "@/lib/security/crypto";
 import { slugify } from "@/lib/utils/text";
-import { paymentSettingsSchema } from "@/lib/validation/payment";
 import { audit } from "@/server/services/audit";
 import { assignTaskToEnrolled, decideApplication } from "@/server/services/applications";
 import { revokeCertificate } from "@/server/services/certificates";
@@ -403,27 +402,10 @@ export async function updateContactAction(_: ActionState, form: FormData): Promi
 // ---- Settings ------------------------------------------------------------------
 
 
-export async function savePaymentSettingsAction(_: ActionState, form: FormData): Promise<ActionState> {
+export async function savePlatformSettingsAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
     const { staff, actor } = await ctx("settings.manage");
-    const data = paymentSettingsSchema.parse({
-      certificateFee: str(form, "certificateFee"), currency: str(form, "currency") ?? "INR", upiId: str(form, "upiId") ?? "",
-      upiPayeeName: str(form, "upiPayeeName"), upiQrFileId: strList(form, "upiQrFileId")[0], instructions: str(form, "instructions"),
-    });
-    const set = (key: string, value: string | number | boolean, type: "STRING" | "NUMBER" | "BOOLEAN") => setSetting(key, value, type, staff.userId, { category: "payment" });
-
-    await set("certificate_fee", data.certificateFee, "NUMBER");
-    await set("currency", data.currency, "STRING");
-    await set("upi_id", data.upiId, "STRING");
-    await set("upi_payee_name", data.upiPayeeName ?? "", "STRING");
-    await set("payment_instructions", data.instructions ?? "", "STRING");
-
-    if (data.upiQrFileId) {
-      const file = await getPrisma().fileAsset.findFirst({ where: { id: data.upiQrFileId, purpose: "PAYMENT_QR", deletedAt: null }, select: { id: true } });
-      if (!file) throw new ValidationError("That QR image is not available.", [{ field: "upiQrFileId", message: "Upload the QR image again." }]);
-      await set("upi_qr_file_id", data.upiQrFileId, "STRING");
-    }
-
+    const set = (key: string, value: string | boolean, type: "STRING" | "BOOLEAN") => setSetting(key, value, type, staff.userId, { category: "platform" });
     await set("application_auto_approve", bool(form, "autoApprove"), "BOOLEAN");
 
     // Save the Hard tier setting when the form supplies a value.
@@ -443,11 +425,7 @@ export async function savePaymentSettingsAction(_: ActionState, form: FormData):
 
     clearSettingsCache();
 
-    await audit(actor, "SETTING_UPDATED", "AppSetting", "payment", {
-      fee: data.certificateFee,
-      currency: data.currency,
-      upiId: data.upiId,
-      qrChanged: Boolean(data.upiQrFileId),
+    await audit(actor, "SETTING_UPDATED", "AppSetting", "platform", {
       autoApprove: bool(form, "autoApprove"),
       ...(hardTierForAudit !== undefined ? { hardTier: hardTierForAudit } : {}),
     });

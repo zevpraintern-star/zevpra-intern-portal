@@ -3,14 +3,13 @@ import { revalidatePath } from "next/cache";
 
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/api/errors";
 import { getPrisma } from "@/lib/db/prisma";
-import { getBranding } from "@/lib/config/branding";
 import { projectSubmissionSchema, reviewDecisionSchema } from "@/lib/validation/submission";
 import { uuidSchema } from "@/lib/validation/common";
 import { audit, securityEvent, type Actor } from "@/server/services/audit";
 import { getOwnApplication } from "@/server/services/applications";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { computeProgress, refreshProgress } from "@/server/services/progress";
-import { getPaymentSettings } from "@/server/services/settings";
+import { issueFreeCertificate } from "@/server/services/certificates";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
 
 export const selectProjectSchema = z.object({ applicationId: uuidSchema, projectId: uuidSchema });
@@ -134,8 +133,6 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
     select: { id: true, programId: true },
   });
   if (!application) throw new NotFoundError("The student's application could not be found.");
-  const payment = await getPaymentSettings();
-
   const claimed = await prisma.$transaction(async (tx) => {
     const result = await tx.projectSubmission.updateMany({
       where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
@@ -154,11 +151,6 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
         where: { id: application.id },
         data: { completionStatus: "COMPLETED", completedAt: now, certificateEligibleAt: now, certificateEligibleById: actor.userId ?? null, progressPercent: 100 },
       });
-      await tx.paymentRequest.upsert({
-        where: { studentId_programId: { studentId: submission.studentId, programId: application.programId } },
-        update: {},
-        create: { applicationId: application.id, studentId: submission.studentId, programId: application.programId, amount: payment.fee, currency: payment.currency },
-      });
     } else {
       await refreshProgress(application.id, tx);
     }
@@ -170,18 +162,18 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
   revalidatePath("/student", "layout");
   revalidatePath("/admin", "layout");
   await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision });
-  if (approved) await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id);
-
-  const fee = `${payment.currency} ${payment.fee}`;
-  await notifyAndEmail({
-    userId: submission.student.id, email: submission.student.email, recipientName: submission.student.name ?? "Student",
-    type: approved ? "CERTIFICATE_ELIGIBLE" : data.decision === "REJECTED" ? "SUBMISSION_REJECTED" : "SUBMISSION_CHANGES_REQUESTED",
-    title: approved ? "Internship complete: certificate available" : data.decision === "REJECTED" ? "Project not approved" : "Project changes requested",
-    body: approved ? "Your project was verified. You can now request your certificate." : `${submission.project.title}: ${data.feedback}`,
-    link: approved ? "/student/payment" : "/student/projects",
-    templateKey: approved ? "certificate_eligible" : "submission_rejected",
-    variables: { itemTitle: submission.project.title, feedback: data.feedback, certificateFee: fee, currency: payment.currency },
-  });
-  void getBranding;
+  if (approved) {
+    await issueFreeCertificate(submission.student.id, application.id, actor);
+  } else {
+    await notifyAndEmail({
+      userId: submission.student.id, email: submission.student.email, recipientName: submission.student.name ?? "Student",
+      type: data.decision === "REJECTED" ? "SUBMISSION_REJECTED" : "SUBMISSION_CHANGES_REQUESTED",
+      title: data.decision === "REJECTED" ? "Project not approved" : "Project changes requested",
+      body: `${submission.project.title}: ${data.feedback}`,
+      link: "/student/projects",
+      templateKey: "submission_rejected",
+      variables: { itemTitle: submission.project.title, feedback: data.feedback },
+    });
+  }
   kickJobs();
 }

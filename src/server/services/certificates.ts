@@ -1,16 +1,20 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import QRCode from "qrcode";
+import { Prisma } from "@/generated/prisma/client";
 
-import { ConflictError, NotFoundError } from "@/lib/api/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
 import { getBranding } from "@/lib/config/branding";
 import { getPrisma } from "@/lib/db/prisma";
 import { sha256Hex } from "@/lib/security/crypto";
+import { randomCode } from "@/lib/security/crypto";
+import { CERTIFICATE } from "@/lib/config/constants";
 import { saveUpload } from "@/lib/storage/storage-service";
 import { audit, type Actor } from "@/server/services/audit";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { getSetting } from "@/server/services/settings";
-import { normalizeTemplateKey, type CertificateTemplateKey } from "@/lib/difficulty";
+import { normalizeTemplateKey, selectCertificateTemplate, type CertificateTemplateKey } from "@/lib/difficulty";
 import type { DifficultyLevel } from "@/generated/prisma/enums";
+import { enqueueJob, kickJobs } from "@/server/jobs/queue";
 
 export type { CertificateTemplateKey };
 
@@ -112,6 +116,75 @@ export async function renderCertificatePdf(cert: {
   pdf.setTitle(`Certificate ${cert.certificateId}`);
   pdf.setAuthor(cert.companyName);
   return pdf.save();
+}
+
+/** Issues a free certificate for a completed application. Safe to retry for legacy students. */
+export async function issueFreeCertificate(studentId: string, applicationId: string, actor: Actor) {
+  const prisma = getPrisma();
+  const branding = getBranding();
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Serialize requests for this application so retries cannot create duplicate certificates.
+    await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`SELECT id FROM applications WHERE id = ${applicationId}::uuid FOR UPDATE`,
+    );
+    const application = await tx.application.findFirst({
+      where: {
+        id: applicationId,
+        studentId,
+        completionStatus: "COMPLETED",
+        certificateEligibleAt: { not: null },
+      },
+      include: {
+        student: { select: { id: true, name: true, studentProfile: { select: { fullName: true, college: true } } } },
+        program: { select: { id: true, title: true, durationLabel: true, difficulty: true, domain: { select: { name: true } } } },
+      },
+    });
+    if (!application) throw new ForbiddenError("Your certificate is available after your completed project is approved.");
+
+    const existing = await tx.certificate.findFirst({ where: { applicationId: application.id } });
+    if (existing) return { certificate: existing, created: false };
+
+    const template = selectCertificateTemplate(await tx.certificateTemplate.findMany(), application.program.difficulty);
+    const verificationId = randomCode(CERTIFICATE.verificationIdLength);
+    const certificate = await tx.certificate.create({
+      data: {
+        certificateId: `${CERTIFICATE.prefix}-${randomCode(CERTIFICATE.randomLength)}`,
+        verificationId,
+        verificationUrl: `${branding.appUrl}${CERTIFICATE.verificationPath}/${verificationId}`,
+        studentId: application.student.id,
+        programId: application.program.id,
+        applicationId: application.id,
+        templateId: template?.id,
+        status: "PENDING",
+        snapshotStudentName: application.student.studentProfile?.fullName ?? application.student.name ?? "Student",
+        snapshotProgramTitle: application.program.title,
+        snapshotDomainName: application.program.domain.name,
+        snapshotDuration: application.program.durationLabel,
+        snapshotCollege: application.student.studentProfile?.college,
+        projectDifficulty: application.program.difficulty,
+        completionDate: application.completedAt,
+      },
+    });
+    await enqueueJob("CERTIFICATE_PDF", { certificateId: certificate.id }, { dedupeKey: `cert-pdf:${certificate.id}`, priority: 10 }, tx);
+    return { certificate, created: true };
+  });
+
+  if (result.created) {
+    await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", applicationId, { certificateId: result.certificate.certificateId, free: true });
+    await prisma.notification.create({
+      data: {
+        userId: studentId,
+        type: "CERTIFICATE_ELIGIBLE",
+        title: "Your free certificate is being prepared",
+        body: "Your internship is complete. The certificate will appear here when it has been generated.",
+        link: "/student/certificate",
+      },
+    });
+    kickJobs();
+  }
+
+  return result.certificate;
 }
 
 /** Job handler. Idempotent: a certificate that already has a PDF is left alone. */

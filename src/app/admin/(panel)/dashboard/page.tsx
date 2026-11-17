@@ -22,15 +22,13 @@ export default async function AdminDashboard() {
         <Stat label="Active internships" value={t.activeInternships} />
         <Stat label="Completed internships" value={t.completedInternships} />
         {link("Pending submissions", t.pendingTaskSubmissions + t.pendingProjectReviews, "/admin/submissions", "tasks.review")}
-        {link("Certificate-eligible, unpaid", t.eligibleNoCert, "/admin/payments?status=ELIGIBLE", "payments.view")}
-        {link("Payments to verify", t.paymentsUnderReview, "/admin/payments", "payments.view")}
+        {link("Certificates to prepare", t.certificatesToPrepare, "/admin/certificates", "certificates.issue")}
         {link("Issued certificates", t.issuedCertificates, "/admin/certificates", "certificates.issue")}
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card><CardHeader><CardTitle>Registrations, last 30 days</CardTitle></CardHeader><CardContent><ColumnChart data={m.registrations} label="Registrations per day" /></CardContent></Card>
         <Card><CardHeader><CardTitle>Applications by domain</CardTitle></CardHeader><CardContent><BarList data={m.byDomain} /></CardContent></Card>
         <Card><CardHeader><CardTitle>Internship completion</CardTitle></CardHeader><CardContent><BarList data={m.completion} /></CardContent></Card>
-        <Card><CardHeader><CardTitle>Certificate payments</CardTitle></CardHeader><CardContent><BarList data={m.payments} empty="No payment requests yet" /></CardContent></Card>
       </div>
 
       <div className="mt-4">

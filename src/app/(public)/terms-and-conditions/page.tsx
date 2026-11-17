@@ -11,7 +11,7 @@ export default function TermsPage() {
       <Card>
         <CardHeader><CardTitle className="text-lg">1. Program Nature & Free Access</CardTitle></CardHeader>
         <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-2">
-          <p>Enrolling in our internship tracks, accessing course materials, submitting tasks, and receiving feedback is entirely free.</p>
+          <p>Enrolling in our internship tracks, accessing course materials, submitting tasks, receiving feedback, and receiving a digital certificate after final project approval are all free.</p>
           <p>This platform offers educational internship simulations designed to build engineering portfolio projects. It does not constitute formal employment or guaranteed job placement.</p>
         </CardContent>
       </Card>

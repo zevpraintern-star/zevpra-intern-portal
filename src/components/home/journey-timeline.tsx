@@ -5,14 +5,14 @@ import { useRef } from "react";
 
 import { JOURNEY_ICONS } from "@/components/home/journey";
 import { Reveal } from "@/components/motion/reveal";
-import { JOURNEY_STEPS, withFee } from "@/lib/content/journey";
+import { JOURNEY_STEPS } from "@/lib/content/journey";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Vertical timeline whose connecting line draws itself as you scroll. Steps
  * alternate sides on wide screens and stack on mobile.
  */
-export function JourneyTimeline({ fee }: { fee: string }) {
+export function JourneyTimeline() {
   const ref = useRef<HTMLOListElement>(null);
   const reduced = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start 70%", "end 60%"] });
@@ -46,7 +46,7 @@ export function JourneyTimeline({ fee }: { fee: string }) {
             >
               <p className="font-display text-sm text-primary">Step {index + 1}</p>
               <h2 className="mt-1 font-display text-2xl font-semibold">{step.title}</h2>
-              <p className="mt-2 font-medium">{withFee(step.summary, fee)}</p>
+              <p className="mt-2 font-medium">{step.summary}</p>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
                 {step.detail}
               </p>

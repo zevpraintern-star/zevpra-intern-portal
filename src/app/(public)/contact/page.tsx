@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Contact", description: "Questions ab
 export default function ContactPage() {
   return (
     <>
-      <PageHero title="Get in touch." description="Questions about tasks, project reviews or certificate payments? We read every message." />
+      <PageHero title="Get in touch." description="Questions about tasks, project reviews or certificates? We read every message." />
       <div className="container-page max-w-xl py-14"><ContactForm /></div>
     </>
   );

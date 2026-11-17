@@ -1,7 +1,9 @@
 import { Award, Download, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
+import { ActionForm, SubmitButton } from "@/components/forms/action-form";
 import { DefinitionList, EmptyState, PageHeader } from "@/components/dashboard/primitives";
+import { Flash } from "@/components/dashboard/flash";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,20 +11,32 @@ import { Card, CardContent } from "@/components/ui/card";
 import { requireStudentPage } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/utils/format";
+import { issueFreeCertificateAction } from "@/app/student/actions";
 
-export default async function CertificatePage() {
+export default async function CertificatePage({ searchParams }: { searchParams: Promise<{ flash?: string }> }) {
   const student = await requireStudentPage();
-  const certs = await getPrisma().certificate.findMany({ where: { studentId: student.userId }, orderBy: { createdAt: "desc" } });
-  const eligible = await getPrisma().application.count({ where: { studentId: student.userId, certificateEligibleAt: { not: null } } });
+  const { flash } = await searchParams;
+  const [certs, eligibleApplications] = await Promise.all([
+    getPrisma().certificate.findMany({ where: { studentId: student.userId }, orderBy: { createdAt: "desc" } }),
+    getPrisma().application.findMany({
+      where: { studentId: student.userId, completionStatus: "COMPLETED", certificateEligibleAt: { not: null } },
+      orderBy: { certificateEligibleAt: "desc" },
+      select: { id: true, program: { select: { title: true } } },
+    }),
+  ]);
+  const missingCertificates = eligibleApplications.filter((application) => !certs.some((certificate) => certificate.applicationId === application.id));
 
   if (certs.length === 0) {
     return (<><PageHeader title="Certificate" />
-      {eligible > 0 ? <EmptyState title="You're eligible for a certificate"><Button asChild className="mt-3"><Link href="/student/payment">Get your certificate</Link></Button></EmptyState>
-      : <EmptyState title="Not available yet">Your certificate becomes available after your project is verified. The internship itself is always free.</EmptyState>}</>);
+      <Flash flash={flash} />
+      {missingCertificates.length > 0 ? <div className="space-y-4">{missingCertificates.map((application) => <Card key={application.id}><CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6"><div><p className="font-semibold">{application.program.title}</p><p className="text-sm text-muted-foreground">Your project is approved. Your digital certificate is free.</p></div><ActionForm action={issueFreeCertificateAction}><input type="hidden" name="applicationId" value={application.id} /><SubmitButton>Get free certificate</SubmitButton></ActionForm></CardContent></Card>)}</div>
+      : <EmptyState title="Not available yet">Your free certificate becomes available after your final project is approved.</EmptyState>}</>);
   }
   return (
     <>
       <PageHeader title="Certificate" />
+      <Flash flash={flash} />
+      {missingCertificates.length > 0 ? <div className="mb-6 space-y-4">{missingCertificates.map((application) => <Card key={application.id}><CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6"><div><p className="font-semibold">{application.program.title}</p><p className="text-sm text-muted-foreground">Your project is approved. Your digital certificate is free.</p></div><ActionForm action={issueFreeCertificateAction}><input type="hidden" name="applicationId" value={application.id} /><SubmitButton>Get free certificate</SubmitButton></ActionForm></CardContent></Card>)}</div> : null}
       <div className="space-y-4">
         {certs.map((c) => (
           <Card key={c.id}><CardContent className="space-y-5 pt-6">

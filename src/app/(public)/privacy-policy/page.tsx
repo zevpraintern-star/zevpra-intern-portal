@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
             <li>Basic student contact information: Full Name, Email, and Mobile number.</li>
             <li>Academic profile: College/Institution name, Degree, Branch, and Graduation year.</li>
             <li>Submissions: Code repositories (GitHub URLs) and task files.</li>
-            <li>Payment proofs: UPI transaction UTR and optional payment screenshots (used only for manual verification).</li>
+            <li>Historical certificate payment details or screenshots submitted before certificate payments were retired, where needed to resolve support requests or maintain existing records.</li>
           </ul>
           <p>We do not collect Aadhaar, PAN, banking login credentials, or unnecessary personal documents.</p>
         </CardContent>

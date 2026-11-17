@@ -15,7 +15,7 @@ const LINES = ["Learn.", "Build.", "Intern.", "Grow."] as const;
  * The opening shot. The four words climb in a staircase (the progression is the
  * message), and the whole block drifts up and fades as the camera leaves the globe.
  */
-export function Hero({ fee }: { fee: string }) {
+export function Hero() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const opacity = useTransform(scrollYProgress, [0, 0.65], [1, 0]);
@@ -90,7 +90,7 @@ export function Hero({ fee }: { fee: string }) {
             transition={{ delay: 1.7, duration: 0.8 }}
             className="mt-6 text-sm text-muted-foreground"
           >
-            No payment is needed to join. The certificate is optional and costs {fee}.
+            The internship and digital certificate are free from sign-up through completion.
           </motion.p>
         </div>
       </motion.div>

@@ -13,11 +13,10 @@ import { saveUpload, validateUpload, type FilePurpose } from "@/lib/storage/stor
 import { securityEvent } from "@/server/services/audit";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
 
-// Task 3: submissions and profiles are links only. The ONLY student upload left is
-// the payment screenshot; staff may upload the payment QR. Every other purpose is
-// rejected here even if a valid FilePurpose enum value is supplied.
-const STUDENT_PURPOSES: FilePurpose[] = ["PAYMENT_SCREENSHOT"];
-const STAFF_PURPOSES: Partial<Record<FilePurpose, string>> = { PAYMENT_QR: "settings.manage" };
+// Certificate payments are retired, so the upload endpoint accepts no new files.
+// Existing private files remain available to authorized administrators.
+const STUDENT_PURPOSES: FilePurpose[] = [];
+const STAFF_PURPOSES: Partial<Record<FilePurpose, string>> = {};
 
 export const POST = route(async (req, _ctx, meta) => {
   const env = getEnv();

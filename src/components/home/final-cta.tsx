@@ -5,7 +5,7 @@ import { Magnetic } from "@/components/motion/magnetic";
 import { Reveal } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
 
-export function FinalCta({ fee }: { fee: string }) {
+export function FinalCta() {
   return (
     <section
       data-stage="cta"
@@ -43,7 +43,6 @@ export function FinalCta({ fee }: { fee: string }) {
               </Button>
             </Magnetic>
           </div>
-          <p className="mt-6 text-sm text-muted-foreground">Optional certificate: {fee}.</p>
         </Reveal>
       </div>
     </section>

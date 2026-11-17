@@ -4,7 +4,6 @@ export const ADMIN_NAV: ReadonlyArray<{ key: string; label: string; href: string
   { key: "students", label: "Students", href: "/admin/students", permission: "students.view" },
   { key: "applications", label: "Applications", href: "/admin/applications", permission: "applications.review" },
   { key: "submissions", label: "Submissions", href: "/admin/submissions", permission: "tasks.review" },
-  { key: "payments", label: "Payments", href: "/admin/payments", permission: "payments.view" },
   { key: "certificates", label: "Certificates", href: "/admin/certificates", permission: "certificates.issue" },
   { key: "programs", label: "Internships", href: "/admin/programs", permission: "programs.manage" },
   { key: "tasks", label: "Tasks", href: "/admin/tasks", permission: "tasks.manage" },

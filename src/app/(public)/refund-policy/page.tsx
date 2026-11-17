@@ -16,9 +16,9 @@ export default function RefundPolicyPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">2. Certificate Fee Refunds</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">2. Certificate payments made before this change</CardTitle></CardHeader>
         <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-2">
-          <p>The optional ₹50 manual verification fee covers administrative review costs. If an accidental duplicate payment is made, students can contact support with both UTRs to receive a full refund within 3 business days.</p>
+          <p>Certificates are now free, and we no longer accept certificate payments. If you made a certificate payment before this change and need help, contact support with your transaction details. We will review the request and respond.</p>
         </CardContent>
       </Card>
     </div>

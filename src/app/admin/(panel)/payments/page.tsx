@@ -27,7 +27,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <Flash flash={flash} />
-      <PageHeader title="Payments" description="Manual UPI verification. Nothing is issued until you approve." actions={can(staff, "payments.view") ? <Button asChild variant="outline"><a href="/api/admin/export/payments">Export CSV</a></Button> : undefined} />
+      <PageHeader title="Historical payments" description="Review records submitted before certificate payments were retired." actions={can(staff, "payments.view") ? <Button asChild variant="outline"><a href="/api/admin/export/payments">Export CSV</a></Button> : undefined} />
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Payment status">
         {TABS.map((t) => <Link key={t} role="tab" aria-selected={t === status} href={`?status=${t}`} className={`rounded-full border px-3 py-1 text-sm ${t === status ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent"}`}>{t.replaceAll("_", " ").toLowerCase()}</Link>)}
       </div>

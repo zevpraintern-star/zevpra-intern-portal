@@ -20,7 +20,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     getPrisma().application.findFirst({
       where: { studentId: student.userId, certificateEligibleAt: { not: null } },
       orderBy: { certificateEligibleAt: "desc" },
-      select: { id: true, programId: true, certificateEligibleAt: true },
+      select: { id: true, certificates: { select: { status: true } } },
     }),
   ]);
 
@@ -40,17 +40,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
 
   const progress = await computeProgress(active.id);
-  const payment = eligibleApplication
-    ? await getPrisma().paymentRequest.findUnique({ where: { studentId_programId: { studentId: student.userId, programId: eligibleApplication.programId } }, select: { status: true, certificate: { select: { status: true } } } })
-    : null;
-  const certStatus = payment?.certificate?.status ?? (eligibleApplication ? (payment?.status === "UNDER_REVIEW" ? "UNDER_REVIEW" : "ELIGIBLE") : "NOT_ELIGIBLE");
+  const certificateStatus = eligibleApplication?.certificates.find((certificate) => certificate.status === "GENERATED")?.status
+    ?? eligibleApplication?.certificates[0]?.status;
+  const certStatus = certificateStatus ?? (eligibleApplication ? "ELIGIBLE" : "NOT_ELIGIBLE");
 
   let next = { label: "Open your tasks", href: "/student/tasks" };
   if (progress.tasksComplete && !progress.projectSelected) next = { label: "Choose your project", href: "/student/projects" };
   else if (progress.projectSelected && progress.projectStatus === null) next = { label: "Submit your GitHub repository", href: "/student/projects" };
   else if (progress.projectStatus === "CHANGES_REQUESTED" || progress.projectStatus === "REJECTED") next = { label: "Update your project", href: "/student/projects" };
-  else if (eligibleApplication && payment?.certificate?.status === "GENERATED") next = { label: "View your certificate", href: "/student/certificate" };
-  else if (eligibleApplication) next = { label: "Get your certificate", href: "/student/payment" };
+  else if (eligibleApplication && certificateStatus === "GENERATED") next = { label: "View your certificate", href: "/student/certificate" };
+  else if (eligibleApplication) next = { label: certificateStatus === "PENDING" ? "Certificate is being prepared" : "Get your free certificate", href: "/student/certificate" };
 
   return (
     <>

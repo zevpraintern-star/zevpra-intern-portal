@@ -14,10 +14,10 @@ const MESSAGES: Record<string, string> = {
   task_reviewed: "Review saved and the student was notified.",
   project_approved: "Project verified. The student is now certificate-eligible.",
   project_reviewed: "Review saved and the student was notified.",
+  certificate_processing: "Your free certificate is being generated.",
   payment_approved: "Payment approved. The certificate is being generated.",
   payment_rejected: "Payment rejected and the student was notified.",
   certificate_revoked: "Certificate revoked. Its verification page now shows it as revoked.",
-  payment_submitted: "Payment proof submitted. Your certificate is issued only after an administrator verifies it.",
 };
 
 export function Flash({ flash }: { flash?: string }) {
