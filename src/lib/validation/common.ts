@@ -75,7 +75,10 @@ export const studentEmailSchema = emailSchema.superRefine((email, context) => {
     }
     return distance[left.length][right.length];
   };
-  const closeDomain = PERSONAL_EMAIL_DOMAINS.find((candidate) => editDistance(domain, candidate) <= 2);
+  const closeDomain = PERSONAL_EMAIL_DOMAINS.find((candidate) => {
+    const distance = editDistance(domain, candidate);
+    return distance > 0 && distance <= 2;
+  });
   if (closeDomain) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
