@@ -14,7 +14,7 @@ import { hashPassword, verifyPassword } from "@/lib/security/crypto";
 import { slugify } from "@/lib/utils/text";
 import { audit } from "@/server/services/audit";
 import { assignTaskToEnrolled, decideApplication } from "@/server/services/applications";
-import { releaseFreeCertificate, revokeCertificate } from "@/server/services/certificates";
+import { regenerateCertificatePdf, releaseFreeCertificate, revokeCertificate } from "@/server/services/certificates";
 import { reviewPayment } from "@/server/services/payments";
 import { reviewProjectSubmission } from "@/server/services/projects";
 import { clearSettingsCache, isHardTierEnabled, setSetting } from "@/server/services/settings";
@@ -275,6 +275,17 @@ export async function releaseCertificateAction(_: ActionState, form: FormData): 
     revalidatePath("/admin", "layout");
     revalidatePath("/student", "layout");
     redirect(`/admin/certificates?flash=${certificate.status === "GENERATED" ? "certificate_released" : "certificate_release_queued"}`);
+  });
+}
+
+export async function regenerateCertificateAction(_: ActionState, form: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { actor } = await ctx("certificates.issue");
+    const certificateId = z.string().uuid().parse(str(form, "certificateId"));
+    await regenerateCertificatePdf(actor, certificateId);
+    revalidatePath("/student", "layout");
+    revalidatePath("/admin", "layout");
+    redirect("/admin/certificates?flash=certificate_regenerated");
   });
 }
 

@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   project_reviewed: "Review saved and the student was notified.",
   certificate_released: "Certificate released. The student was notified by email and in the portal.",
   certificate_release_queued: "Certificate release is queued. The student will be notified when it is ready.",
+  certificate_regenerated: "The certificate PDF was updated with the latest design.",
   payment_approved: "Payment approved. The certificate is being generated.",
   payment_rejected: "Payment rejected and the student was notified.",
   certificate_revoked: "Certificate revoked. Its verification page now shows it as revoked.",
