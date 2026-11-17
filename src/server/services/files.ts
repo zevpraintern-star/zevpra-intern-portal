@@ -25,7 +25,7 @@ export async function assertAttachableFiles(
   if (files.length !== unique.length) throw new ForbiddenError("One of the attached files is not available.");
   for (const file of files) {
     const attached = file._count.paymentScreenshots;
-    if (file.ownerUserId !== userId || !purposes.includes(file.purpose) || file.deletedAt || file.scanStatus === "INFECTED" || attached > 0) {
+    if (file.ownerUserId !== userId || !purposes.includes(file.purpose) || file.deletedAt || file.scanStatus !== "CLEAN" || attached > 0) {
       throw new ForbiddenError("One of the attached files is not available.");
     }
   }

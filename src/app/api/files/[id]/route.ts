@@ -34,7 +34,11 @@ export const GET = route<{ params: Promise<{ id: string }> }>(async (req, ctx) =
 
   const asset = await getPrisma().fileAsset.findFirst({ where: { id: fileId.data, deletedAt: null }, select: { id: true, ownerUserId: true, purpose: true, scanStatus: true } });
   if (!asset) throw new NotFoundError("File not found.");
-  if (asset.scanStatus === "INFECTED") throw new ForbiddenError();
+  // Files stay unavailable until scanning succeeds. SKIPPED is permitted only
+  // for certificates rendered and stored by this server, never user uploads.
+  if (asset.scanStatus !== "CLEAN" && !(asset.scanStatus === "SKIPPED" && asset.purpose === "CERTIFICATE_PDF")) {
+    throw new ForbiddenError("This file is not available until its security scan is complete.");
+  }
 
   let allowed = student?.user.id === asset.ownerUserId;
   if (!allowed && adminSession) {

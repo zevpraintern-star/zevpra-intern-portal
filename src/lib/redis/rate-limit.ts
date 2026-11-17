@@ -234,14 +234,13 @@ export const rateLimits = {
 } as const;
 
 /**
- * Resolves the client IP from proxy headers. Cloudflare supplies
- * cf-connecting-ip; standard proxies use x-forwarded-for.
+ * Resolves the client IP from trusted deployment headers. On Vercel,
+ * x-vercel-forwarded-for is supplied by the platform. Never trust
+ * cf-connecting-ip here: it is only trustworthy when a controlled Cloudflare
+ * proxy is guaranteed to overwrite it before requests reach this app.
  */
 export function clientIpFromHeaders(headers: Headers): string {
-  const cloudflareIp = headers.get("cf-connecting-ip")?.trim();
-  if (cloudflareIp) return cloudflareIp;
-
-  const forwarded = headers.get("x-forwarded-for");
+  const forwarded = headers.get("x-vercel-forwarded-for") ?? headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;
