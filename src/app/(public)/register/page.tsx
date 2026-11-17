@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import { COUNTRY_CODES } from "@/lib/config/constants";
+import { OtpCodeInput } from "@/components/auth/otp-code-input";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -76,15 +77,15 @@ export default function RegisterPage() {
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyOtp = async (enteredCode: string = code) => {
+    if (loading) return;
     setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, purpose: "STUDENT_REGISTER" }),
+        body: JSON.stringify({ email, code: enteredCode, purpose: "STUDENT_REGISTER" }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message || "Invalid code.");
@@ -171,21 +172,20 @@ export default function RegisterPage() {
                   </Button>
                 </form>
               ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <form onSubmit={(event) => { event.preventDefault(); if (code.length === 6) void handleVerifyOtp(code); }} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="code">Enter 6-digit Code sent to {email}</Label>
-                    <Input
+                    <OtpCodeInput
                       id="code"
-                      type="text"
-                      placeholder="123456"
-                      maxLength={6}
-                      className="font-mono text-center tracking-widest text-lg"
-                      required
                       value={code}
-                      onChange={(e) => setCode(e.target.value)}
+                      onChange={setCode}
+                      onComplete={handleVerifyOtp}
+                      disabled={loading}
+                      autoFocus
+                      status={loading ? "Verifying email…" : "Enter the 6 digits. It verifies automatically."}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
                     {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <CheckCircle2 className="mr-2 size-4" />}
                     Verify & Continue
                   </Button>

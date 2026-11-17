@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, Mail } from "lucide-react";
+import { OtpCodeInput } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,8 +46,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyOtp = async (enteredCode: string = code) => {
+    if (loading) return;
     setError(null);
     setLoading(true);
 
@@ -54,7 +55,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, purpose: "STUDENT_LOGIN" }),
+        body: JSON.stringify({ email, code: enteredCode, purpose: "STUDENT_LOGIN" }),
       });
 
       const data = await res.json();
@@ -118,22 +119,21 @@ export default function LoginPage() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <form onSubmit={(event) => { event.preventDefault(); if (code.length === 6) void handleVerifyOtp(code); }} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="code">One-Time Password (OTP)</Label>
-                <Input
+                <OtpCodeInput
                   id="code"
-                  type="text"
-                  placeholder="123456"
-                  maxLength={6}
-                  className="font-mono text-center tracking-widest text-lg"
-                  required
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={setCode}
+                  onComplete={handleVerifyOtp}
+                  disabled={loading}
+                  autoFocus
+                  status={loading ? "Verifying code…" : "Enter the 6 digits. It verifies automatically."}
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
                 {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <CheckCircle2 className="mr-2 size-4" />}
                 {loading ? "Verifying..." : "Sign In"}
               </Button>
@@ -141,7 +141,7 @@ export default function LoginPage() {
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={() => setStep("email")}
+                  onClick={() => { setCode(""); setError(null); setInfo(null); setStep("email"); }}
                   className="text-xs text-muted-foreground hover:underline"
                 >
                   Use a different email address

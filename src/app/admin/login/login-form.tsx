@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OtpCodeInput } from "@/components/auth/otp-code-input";
 
 async function post(url: string, body: unknown) {
   const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -22,26 +23,41 @@ export function AdminLoginForm() {
   const [step, setStep] = useState<"password" | "code">("password");
   const [email, setEmail] = useState("");
   const [masked, setMasked] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit(form: FormData) {
+  async function verifyCode(codeValue: string) {
+    if (busy) return;
     setError(null);
     setBusy(true);
     try {
-      if (step === "password") {
-        const mail = String(form.get("email") ?? "");
-        const result = await post("/api/auth/admin/login", { email: mail, password: String(form.get("password") ?? ""), honeypot: String(form.get("company") ?? "") });
-        if (!result.success) return setError(result.error?.message ?? "Sign-in failed.");
-        setEmail(mail);
-        setMasked(result.data?.maskedEmail ?? "your email");
-        setStep("code");
-      } else {
-        const result = await post("/api/auth/admin/verify", { email, code: String(form.get("code") ?? "") });
-        if (!result.success) return setError(result.error?.message ?? "That code did not work.");
-        router.push("/admin/dashboard");
-        router.refresh();
-      }
+      const result = await post("/api/auth/admin/verify", { email, code: codeValue });
+      if (!result.success) return setError(result.error?.message ?? "That code did not work.");
+      router.push("/admin/dashboard");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not verify the code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit(form: FormData) {
+    if (step === "code") {
+      await verifyCode(String(form.get("code") ?? code));
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const mail = String(form.get("email") ?? "");
+      const result = await post("/api/auth/admin/login", { email: mail, password: String(form.get("password") ?? ""), honeypot: String(form.get("company") ?? "") });
+      if (!result.success) return setError(result.error?.message ?? "Sign-in failed.");
+      setEmail(mail);
+      setMasked(result.data?.maskedEmail ?? "your email");
+      setCode("");
+      setStep("code");
     } finally {
       setBusy(false);
     }
@@ -93,7 +109,15 @@ export function AdminLoginForm() {
                 <Alert title="Code sent">We sent a 6-digit code to {masked}. Enter it below to finish signing in.</Alert>
                 <div>
                   <Label htmlFor="code">Verification code</Label>
-                  <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" required autoFocus className="mt-1.5 text-center font-mono text-lg tracking-[0.5em]" />
+                  <OtpCodeInput
+                    id="code"
+                    value={code}
+                    onChange={setCode}
+                    onComplete={verifyCode}
+                    disabled={busy}
+                    autoFocus
+                    status={busy ? "Verifying admin access…" : "Enter the 6 digits. It verifies automatically."}
+                  />
                 </div>
               </motion.div>
             )}
@@ -108,6 +132,7 @@ export function AdminLoginForm() {
             <button
               type="button"
               onClick={() => {
+                setCode("");
                 setStep("password");
                 setError(null);
               }}
