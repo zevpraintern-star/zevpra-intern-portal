@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont } from "pdf-lib";
 import QRCode from "qrcode";
 import { Prisma } from "@/generated/prisma/client";
 
@@ -57,20 +57,7 @@ export async function renderCertificatePdf(cert: {
   const sansBold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const tier = TIER_SPEC[cert.templateKey];
   const white = rgb(1, 1, 1);
-  const navy = rgb(0.025, 0.045, 0.085);
-  const bodyInk = rgb(0.92, 0.95, 1);
-  const secondary = rgb(0.66, 0.74, 0.87);
-  const gold = rgb(0.76, 0.59, 0.31);
-  const paper = rgb(0.045, 0.075, 0.13);
-  const panel = rgb(0.075, 0.12, 0.2);
-  const primary = rgb(0.53, 0.69, 1);
   const tierColor = rgb(0.16, 0.28, 0.44);
-
-  const centered = (text: string, y: number, font: PDFFont, size: number, color = bodyInk, maxWidth = width - 100) => {
-    const value = safe(font, text);
-    const fittedSize = Math.min(size, maxWidth / Math.max(font.widthOfTextAtSize(value, size) / size, 1));
-    page.drawText(value, { x: (width - font.widthOfTextAtSize(value, fittedSize)) / 2, y, size: fittedSize, font, color });
-  };
   const wrapped = (text: string, x: number, y: number, maxWidth: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>, lineHeight: number, maxLines: number) => {
     const words = safe(font, text).split(/\s+/).filter(Boolean);
     const lines: string[] = [];
@@ -84,38 +71,64 @@ export async function renderCertificatePdf(cert: {
     lines.slice(0, maxLines).forEach((lineText, index) => page.drawText(lineText, { x, y: y - index * lineHeight, size, font, color }));
   };
 
-  // Clean landscape frame with restrained navy, gold and brand-color accents.
-  page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0.018, 0.032, 0.065) });
-  page.drawRectangle({ x: 18, y: 18, width: width - 36, height: height - 36, color: paper, borderColor: rgb(0.23, 0.36, 0.55), borderWidth: 1.2 });
-  page.drawRectangle({ x: 27, y: 27, width: width - 54, height: height - 54, borderColor: gold, borderWidth: 0.7 });
+  // Modern Split layout, using the same connected-node mark as the website logo.
+  const sideWidth = 160;
+  const contentLeft = sideWidth + 28;
+  const contentRight = width - 25;
+  const contentWidth = contentRight - contentLeft;
+  const contentCenter = contentLeft + contentWidth / 2;
+  const ink = rgb(0.07, 0.12, 0.2);
+  const muted = rgb(0.34, 0.43, 0.56);
+  const line = rgb(0.84, 0.88, 0.93);
+  const paleBlue = rgb(0.91, 0.94, 0.98);
+  const logoBlue = rgb(0.48, 0.62, 1);
+  const logoInk = rgb(0.035, 0.07, 0.14);
 
-  // Brand header and certificate level badge.
-  page.drawRectangle({ x: 28, y: height - 94, width: width - 56, height: 64, color: navy });
-  page.drawRectangle({ x: 28, y: height - 98, width: width - 56, height: 4, color: gold });
-  page.drawText(safe(sansBold, cert.companyName), { x: 58, y: height - 59, size: 16, font: sansBold, color: white });
-  page.drawText("DIGITAL INTERNSHIP CREDENTIAL", { x: 59, y: height - 77, size: 7.5, font: sansBold, color: rgb(0.78, 0.83, 0.91) });
-  page.drawRectangle({ x: width - 153, y: height - 72, width: 104, height: 24, color: tierColor });
+  page.drawRectangle({ x: 0, y: 0, width, height, color: white });
+  page.drawRectangle({ x: 0, y: 0, width: sideWidth, height, color: rgb(0.055, 0.11, 0.2) });
+  page.drawRectangle({ x: sideWidth - 2, y: 0, width: 2, height, color: rgb(0.13, 0.25, 0.4) });
+
+  // Recreate the site's blue app tile and connected-node logo in vector form.
+  page.drawRectangle({ x: 20, y: height - 82, width: 42, height: 42, color: logoBlue });
+  const mark = (x: number, y: number) => page.drawCircle({ x, y, size: 2.4, color: logoInk });
+  page.drawLine({ start: { x: 41, y: height - 49 }, end: { x: 31, y: height - 68 }, thickness: 1.6, color: logoInk });
+  page.drawLine({ start: { x: 41, y: height - 49 }, end: { x: 51, y: height - 68 }, thickness: 1.6, color: logoInk });
+  page.drawLine({ start: { x: 31, y: height - 68 }, end: { x: 51, y: height - 68 }, thickness: 1.6, color: logoInk });
+  mark(41, height - 48);
+  mark(30, height - 69);
+  mark(52, height - 69);
+  page.drawText(safe(sansBold, cert.companyName), { x: 20, y: height - 108, size: 13, font: sansBold, color: white, maxWidth: sideWidth - 38 });
+  page.drawText("PROFESSIONAL INTERNSHIP PROGRAM", { x: 24, y: 150, size: 8, font: sans, color: rgb(0.76, 0.82, 0.9), rotate: degrees(90) });
+  page.drawText("DIGITAL CREDENTIAL", { x: 20, y: 22, size: 7, font: sansBold, color: rgb(0.83, 0.88, 0.95) });
+
+  const title = "CERTIFICATE OF COMPLETION";
+  const titleSize = Math.min(19, contentWidth / (serifBold.widthOfTextAtSize(title, 19) / 19));
+  page.drawText(title, { x: contentLeft, y: height - 65, size: titleSize, font: serifBold, color: ink });
+  page.drawText(`VERIFIED LEARNING  -  ${cert.issueDate.getUTCFullYear()}`, { x: contentLeft, y: height - 43, size: 7.5, font: sans, color: rgb(0.2, 0.36, 0.62), characterSpacing: 1.2 });
+  page.drawRectangle({ x: contentRight - 92, y: height - 54, width: 92, height: 24, color: tierColor });
   const tierText = safe(sansBold, tier.label.toUpperCase());
-  page.drawText(tierText, { x: width - 153 + (104 - sansBold.widthOfTextAtSize(tierText, 8)) / 2, y: height - 63, size: 8, font: sansBold, color: white });
+  const tierSize = Math.min(7.5, 76 / Math.max(sansBold.widthOfTextAtSize(tierText, 7.5) / 7.5, 1));
+  page.drawText(tierText, { x: contentRight - 92 + (92 - sansBold.widthOfTextAtSize(tierText, tierSize)) / 2, y: height - 45, size: tierSize, font: sansBold, color: white });
 
-  centered("CERTIFICATE OF COMPLETION", height - 145, serifBold, 27, navy);
-  page.drawLine({ start: { x: 365, y: height - 158 }, end: { x: 477, y: height - 158 }, thickness: 1.5, color: gold });
-  centered("This certificate is proudly presented to", height - 185, sans, 12, secondary);
+  const rightCentered = (text: string, y: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>, maxWidth = contentWidth - 24) => {
+    const value = safe(font, text);
+    const fittedSize = Math.min(size, maxWidth / Math.max(font.widthOfTextAtSize(value, size) / size, 1));
+    page.drawText(value, { x: contentCenter - font.widthOfTextAtSize(value, fittedSize) / 2, y, size: fittedSize, font, color });
+  };
+  rightCentered("Awarded to", 350, sans, 12, muted);
+  rightCentered(cert.studentName, 305, serif, 38, rgb(0.16, 0.32, 0.53), contentWidth - 34);
+  rightCentered("for successfully completing", 275, sans, 11, muted);
+  rightCentered(cert.programTitle, 244, serif, 18, rgb(0.25, 0.34, 0.47), contentWidth - 35);
 
-  centered(cert.studentName, height - 237, serifBold, 38, primary, width - 130);
-  page.drawLine({ start: { x: 252, y: height - 248 }, end: { x: width - 252, y: height - 248 }, thickness: 0.9, color: gold });
-  centered("for successfully completing the online internship", height - 273, serif, 13, secondary);
-  centered(cert.programTitle, height - 309, serifBold, 22, bodyInk, width - 110);
-
-  // Program facts are grouped in a clear, balanced panel.
-  const panelX = 78;
-  const panelY = 210;
-  const panelW = width - 156;
-  const panelH = 52;
-  page.drawRectangle({ x: panelX, y: panelY, width: panelW, height: panelH, color: panel });
+  // Program facts sit in a light, three-column band.
+  const panelX = contentLeft;
+  const panelY = 188;
+  const panelW = contentWidth;
+  const panelH = 49;
+  page.drawRectangle({ x: panelX, y: panelY, width: panelW, height: panelH, color: paleBlue });
   const colW = panelW / 3;
-  page.drawLine({ start: { x: panelX + colW, y: panelY + 8 }, end: { x: panelX + colW, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.19, 0.28, 0.41) });
-  page.drawLine({ start: { x: panelX + colW * 2, y: panelY + 8 }, end: { x: panelX + colW * 2, y: panelY + panelH - 8 }, thickness: 0.7, color: rgb(0.19, 0.28, 0.41) });
+  page.drawLine({ start: { x: panelX + colW, y: panelY + 8 }, end: { x: panelX + colW, y: panelY + panelH - 8 }, thickness: 0.7, color: line });
+  page.drawLine({ start: { x: panelX + colW * 2, y: panelY + 8 }, end: { x: panelX + colW * 2, y: panelY + panelH - 8 }, thickness: 0.7, color: line });
   const facts = [
     { label: "DOMAIN", value: cert.domainName },
     { label: "DURATION", value: cert.duration },
@@ -125,36 +138,32 @@ export async function renderCertificatePdf(cert: {
     const x = panelX + colW * index;
     const value = safe(sansBold, fact.value);
     const valueSize = Math.min(11, (colW - 18) / Math.max(sansBold.widthOfTextAtSize(value, 11) / 11, 1));
-    page.drawText(fact.label, { x: x + 10, y: panelY + 33, size: 7, font: sansBold, color: secondary });
-    page.drawText(value, { x: x + (colW - sansBold.widthOfTextAtSize(value, valueSize)) / 2, y: panelY + 14, size: valueSize, font: sansBold, color: bodyInk });
+    const labelWidth = sansBold.widthOfTextAtSize(fact.label, 7);
+    page.drawText(fact.label, { x: x + (colW - labelWidth) / 2, y: panelY + 31, size: 7, font: sansBold, color: muted });
+    page.drawText(value, { x: x + (colW - sansBold.widthOfTextAtSize(value, valueSize)) / 2, y: panelY + 13, size: valueSize, font: sansBold, color: ink });
   });
 
-  const completed = `COMPLETED  ${formatLongDate(cert.completionDate)}`;
-  const issued = `ISSUED  ${formatLongDate(cert.issueDate)}`;
-  page.drawText(completed, { x: 170, y: 183, size: 9, font: sans, color: secondary });
-  page.drawText(issued, { x: 486, y: 183, size: 9, font: sans, color: secondary });
-
-  // Verification footer: ID and URL remain readable next to the scannable QR.
-  page.drawLine({ start: { x: 58, y: 158 }, end: { x: width - 58, y: 158 }, thickness: 0.8, color: rgb(0.19, 0.28, 0.41) });
-  page.drawText("CERTIFICATE ID", { x: 60, y: 140, size: 7, font: sansBold, color: secondary });
-  page.drawText(safe(sansBold, cert.certificateId), { x: 60, y: 124, size: 10, font: sansBold, color: bodyInk });
-  page.drawText("VERIFY ONLINE", { x: 60, y: 105, size: 7, font: sansBold, color: secondary });
-  wrapped(cert.verificationUrl, 60, 91, 590, sans, 8, primary, 10, 2);
+  page.drawText(`COMPLETED  ${formatLongDate(cert.completionDate)}`, { x: contentLeft, y: 73, size: 8, font: sans, color: muted });
+  page.drawText(`ISSUED  ${formatLongDate(cert.issueDate)}`, { x: contentCenter + 10, y: 73, size: 8, font: sans, color: muted });
+  page.drawText(`CERTIFICATE ID  ${safe(sansBold, cert.certificateId)}`, { x: contentLeft, y: 55, size: 8.5, font: sansBold, color: ink });
+  const safeUrl = safe(sans, cert.verificationUrl);
+  const urlSize = Math.min(7, (contentWidth - 85) / Math.max(sans.widthOfTextAtSize(safeUrl, 7) / 7, 1));
+  page.drawText(safeUrl, { x: contentLeft, y: 39, size: urlSize, font: sans, color: rgb(0.2, 0.36, 0.62) });
 
   const qr = await QRCode.toBuffer(cert.verificationUrl, { width: 260, margin: 1, errorCorrectionLevel: "M" });
   const qrImage = await pdf.embedPng(qr);
-  page.drawRectangle({ x: width - 137, y: 42, width: 78, height: 78, color: white, borderColor: rgb(0.49, 0.62, 0.8), borderWidth: 0.7 });
-  page.drawImage(qrImage, { x: width - 132, y: 47, width: 68, height: 68 });
+  page.drawRectangle({ x: width - 94, y: 24, width: 68, height: 68, color: white, borderColor: line, borderWidth: 0.7 });
+  page.drawImage(qrImage, { x: width - 90, y: 28, width: 60, height: 60 });
   const qrCaption = "SCAN TO VERIFY";
   page.drawText(qrCaption, {
-    x: width - 137 + (78 - sansBold.widthOfTextAtSize(qrCaption, 6.5)) / 2,
-    y: 32,
-    size: 6.5,
+    x: width - 94 + (68 - sansBold.widthOfTextAtSize(qrCaption, 5.5)) / 2,
+    y: 16,
+    size: 5.5,
     font: sansBold,
-    color: secondary,
+    color: muted,
   });
 
-  wrapped(cert.disclaimer, 60, 57, 565, sans, 7, secondary, 9, 3);
+  wrapped(cert.disclaimer, contentLeft, 25, contentWidth - 92, sans, 6, muted, 8, 2);
 
   pdf.setTitle(`Certificate ${cert.certificateId}`);
   pdf.setAuthor(cert.companyName);
