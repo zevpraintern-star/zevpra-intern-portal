@@ -5,9 +5,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
 import { getBranding } from "@/lib/config/branding";
 import { getPrisma } from "@/lib/db/prisma";
-import { sha256Hex } from "@/lib/security/crypto";
-import { randomCode } from "@/lib/security/crypto";
 import { CERTIFICATE } from "@/lib/config/constants";
+import { randomCode, sha256Hex } from "@/lib/security/crypto";
+import { logger } from "@/lib/logger";
 import { saveUpload } from "@/lib/storage/storage-service";
 import { audit, type Actor } from "@/server/services/audit";
 import { notifyAndEmail } from "@/server/services/notifications";
@@ -118,8 +118,8 @@ export async function renderCertificatePdf(cert: {
   return pdf.save();
 }
 
-/** Issues a free certificate for a completed application. Safe to retry for legacy students. */
-export async function issueFreeCertificate(studentId: string, applicationId: string, actor: Actor) {
+/** Admin release for a completed application. Safe to retry for legacy records. */
+export async function releaseFreeCertificate(applicationId: string, actor: Actor) {
   const prisma = getPrisma();
   const branding = getBranding();
 
@@ -131,7 +131,6 @@ export async function issueFreeCertificate(studentId: string, applicationId: str
     const application = await tx.application.findFirst({
       where: {
         id: applicationId,
-        studentId,
         completionStatus: "COMPLETED",
         certificateEligibleAt: { not: null },
       },
@@ -140,10 +139,11 @@ export async function issueFreeCertificate(studentId: string, applicationId: str
         program: { select: { id: true, title: true, durationLabel: true, difficulty: true, domain: { select: { name: true } } } },
       },
     });
-    if (!application) throw new ForbiddenError("Your certificate is available after your completed project is approved.");
+    if (!application) throw new ForbiddenError("A certificate can be released only after the final project is approved.");
 
     const existing = await tx.certificate.findFirst({ where: { applicationId: application.id } });
-    if (existing) return { certificate: existing, created: false };
+    if (existing?.status === "REVOKED") throw new ConflictError("This certificate was revoked and cannot be released again.");
+    if (existing) return { certificate: existing, released: existing.status !== "GENERATED" };
 
     const template = selectCertificateTemplate(await tx.certificateTemplate.findMany(), application.program.difficulty);
     const verificationId = randomCode(CERTIFICATE.verificationIdLength);
@@ -167,24 +167,29 @@ export async function issueFreeCertificate(studentId: string, applicationId: str
       },
     });
     await enqueueJob("CERTIFICATE_PDF", { certificateId: certificate.id }, { dedupeKey: `cert-pdf:${certificate.id}`, priority: 10 }, tx);
-    return { certificate, created: true };
+    return { certificate, released: true };
   });
 
-  if (result.created) {
-    await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", applicationId, { certificateId: result.certificate.certificateId, free: true });
-    await prisma.notification.create({
-      data: {
-        userId: studentId,
-        type: "CERTIFICATE_ELIGIBLE",
-        title: "Your free certificate is being prepared",
-        body: "Your internship is complete. The certificate will appear here when it has been generated.",
-        link: "/student/certificate",
-      },
-    });
-    kickJobs();
+  // Release generates the PDF immediately. The queued job remains as a retry path if
+  // storage or PDF generation is temporarily unavailable.
+  if (result.certificate.status === "PENDING") {
+    try {
+      await generateCertificate(result.certificate.id);
+    } catch (error) {
+      logger.error("[certificates] immediate generation failed; queued retry retained", {
+        certificateId: result.certificate.certificateId,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    } finally {
+      kickJobs();
+    }
   }
 
-  return result.certificate;
+  const released = await prisma.certificate.findUniqueOrThrow({ where: { id: result.certificate.id } });
+  if (result.released && released.status === "GENERATED") {
+    await audit(actor, "CERTIFICATE_GENERATED", "Certificate", released.id, { releasedByAdmin: true, free: true });
+  }
+  return released;
 }
 
 /** Job handler. Idempotent: a certificate that already has a PDF is left alone. */

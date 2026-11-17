@@ -22,7 +22,7 @@ export default async function AdminDashboard() {
         <Stat label="Active internships" value={t.activeInternships} />
         <Stat label="Completed internships" value={t.completedInternships} />
         {link("Pending submissions", t.pendingTaskSubmissions + t.pendingProjectReviews, "/admin/submissions", "tasks.review")}
-        {link("Certificates to prepare", t.certificatesToPrepare, "/admin/certificates", "certificates.issue")}
+        {link("Certificates awaiting release", t.certificatesToPrepare, "/admin/certificates", "certificates.issue")}
         {link("Issued certificates", t.issuedCertificates, "/admin/certificates", "certificates.issue")}
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

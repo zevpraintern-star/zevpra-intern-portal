@@ -9,7 +9,6 @@ import { audit, securityEvent, type Actor } from "@/server/services/audit";
 import { getOwnApplication } from "@/server/services/applications";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { computeProgress, refreshProgress } from "@/server/services/progress";
-import { issueFreeCertificate } from "@/server/services/certificates";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
 
 export const selectProjectSchema = z.object({ applicationId: uuidSchema, projectId: uuidSchema });
@@ -163,7 +162,20 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
   revalidatePath("/admin", "layout");
   await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision });
   if (approved) {
-    await issueFreeCertificate(submission.student.id, application.id, actor);
+    await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id, { free: true, awaitingAdminRelease: true });
+  }
+  if (approved) {
+    await notifyAndEmail({
+      userId: submission.student.id,
+      email: submission.student.email,
+      recipientName: submission.student.name ?? "Student",
+      type: "SUBMISSION_APPROVED",
+      title: "Final project approved",
+      body: "Your final project has been verified. An administrator will release your free certificate. We’ll notify you again when it is ready.",
+      link: "/student/certificate",
+      templateKey: "submission_approved",
+      variables: { itemTitle: submission.project.title, feedback: data.feedback || "Your free certificate will be released separately by an administrator." },
+    });
   } else {
     await notifyAndEmail({
       userId: submission.student.id, email: submission.student.email, recipientName: submission.student.name ?? "Student",

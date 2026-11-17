@@ -42,14 +42,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const progress = await computeProgress(active.id);
   const certificateStatus = eligibleApplication?.certificates.find((certificate) => certificate.status === "GENERATED")?.status
     ?? eligibleApplication?.certificates[0]?.status;
-  const certStatus = certificateStatus ?? (eligibleApplication ? "ELIGIBLE" : "NOT_ELIGIBLE");
+  const certStatus = certificateStatus === "PENDING" || (!certificateStatus && eligibleApplication)
+    ? "AWAITING_RELEASE"
+    : certificateStatus ?? "NOT_ELIGIBLE";
 
   let next = { label: "Open your tasks", href: "/student/tasks" };
   if (progress.tasksComplete && !progress.projectSelected) next = { label: "Choose your project", href: "/student/projects" };
   else if (progress.projectSelected && progress.projectStatus === null) next = { label: "Submit your GitHub repository", href: "/student/projects" };
   else if (progress.projectStatus === "CHANGES_REQUESTED" || progress.projectStatus === "REJECTED") next = { label: "Update your project", href: "/student/projects" };
   else if (eligibleApplication && certificateStatus === "GENERATED") next = { label: "View your certificate", href: "/student/certificate" };
-  else if (eligibleApplication) next = { label: certificateStatus === "PENDING" ? "Certificate is being prepared" : "Get your free certificate", href: "/student/certificate" };
+  else if (eligibleApplication) next = { label: "Certificate awaiting admin release", href: "/student/certificate" };
 
   return (
     <>

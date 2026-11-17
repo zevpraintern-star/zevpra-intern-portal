@@ -13,7 +13,6 @@ import { getPrisma } from "@/lib/db/prisma";
 import { githubProfileUrlSchema } from "@/lib/validation/common";
 import { studentRegistrationSchema } from "@/lib/validation/student";
 import { applyToProgram, withdrawApplication } from "@/server/services/applications";
-import { issueFreeCertificate } from "@/server/services/certificates";
 import { selectProject, submitProject } from "@/server/services/projects";
 import { submitTask } from "@/server/services/tasks";
 import { markAllRead, markRead } from "@/server/services/notifications";
@@ -71,16 +70,6 @@ export async function submitProjectAction(_: ActionState, form: FormData): Promi
     } as never, actor);
     revalidatePath("/student", "layout");
     redirect("/student/projects?flash=project_submitted");
-  });
-}
-
-export async function issueFreeCertificateAction(_: ActionState, form: FormData): Promise<ActionState> {
-  return runAction(async () => {
-    const { student, actor } = await context();
-    const applicationId = z.string().uuid().parse(str(form, "applicationId"));
-    await issueFreeCertificate(student.userId, applicationId, actor);
-    revalidatePath("/student", "layout");
-    redirect("/student/certificate?flash=certificate_processing");
   });
 }
 

@@ -14,7 +14,7 @@ import { hashPassword, verifyPassword } from "@/lib/security/crypto";
 import { slugify } from "@/lib/utils/text";
 import { audit } from "@/server/services/audit";
 import { assignTaskToEnrolled, decideApplication } from "@/server/services/applications";
-import { revokeCertificate } from "@/server/services/certificates";
+import { releaseFreeCertificate, revokeCertificate } from "@/server/services/certificates";
 import { reviewPayment } from "@/server/services/payments";
 import { reviewProjectSubmission } from "@/server/services/projects";
 import { clearSettingsCache, isHardTierEnabled, setSetting } from "@/server/services/settings";
@@ -264,6 +264,17 @@ export async function reviewPaymentAction(_: ActionState, form: FormData): Promi
     const result = await reviewPayment(actor, { paymentRequestId: str(form, "paymentRequestId") as string, decision: str(form, "decision") as "APPROVED", reason: str(form, "reason") } as never);
     revalidatePath("/admin", "layout");
     redirect(`/admin/payments?flash=${result.certificateId ? "payment_approved" : "payment_rejected"}`);
+  });
+}
+
+export async function releaseCertificateAction(_: ActionState, form: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { actor } = await ctx("certificates.issue");
+    const applicationId = z.string().uuid().parse(str(form, "applicationId"));
+    const certificate = await releaseFreeCertificate(applicationId, actor);
+    revalidatePath("/admin", "layout");
+    revalidatePath("/student", "layout");
+    redirect(`/admin/certificates?flash=${certificate.status === "GENERATED" ? "certificate_released" : "certificate_release_queued"}`);
   });
 }
 

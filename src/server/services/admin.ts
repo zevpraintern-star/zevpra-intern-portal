@@ -24,7 +24,7 @@ export async function dashboardMetrics() {
     prisma.application.count({ where: { completionStatus: "COMPLETED" } }),
     prisma.taskSubmission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
     prisma.projectSubmission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
-    prisma.application.count({ where: { certificateEligibleAt: { not: null }, certificates: { none: {} } } }),
+    prisma.application.count({ where: { certificateEligibleAt: { not: null }, certificates: { none: { status: { in: ["GENERATED", "REVOKED"] } } } } }),
     prisma.certificate.count({ where: { status: "GENERATED" } }),
     prisma.emailLog.count({ where: { status: "SENT", sentAt: { gte: sinceMidnight } } }),
   ]);
