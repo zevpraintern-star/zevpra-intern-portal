@@ -16,6 +16,62 @@ export const emailSchema = z
   .email("Enter a valid email address.")
   .max(255, "Email address is too long.");
 
+const ACADEMIC_EMAIL_SUFFIXES = [".edu", ".edu.in", ".ac.in", ".ac.uk", ".edu.au"];
+const PERSONAL_EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "protonmail.com"];
+const KNOWN_EMAIL_DOMAIN_TYPOS: Record<string, string> = {
+  "gmial.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmg.com": "gmail.com",
+  "gmail.con": "gmail.com",
+  "gmail.co": "gmail.com",
+  "yaho.com": "yahoo.com",
+  "yahooo.com": "yahoo.com",
+  "outlok.com": "outlook.com",
+  "hotmal.com": "hotmail.com",
+};
+
+/** Student accounts must use personal mail, and obvious provider typos should not receive OTPs. */
+export const studentEmailSchema = emailSchema.superRefine((email, context) => {
+  const domain = email.split("@")[1] ?? "";
+  if (ACADEMIC_EMAIL_SUFFIXES.some((suffix) => domain.endsWith(suffix))) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Student or college email addresses aren't accepted. Please use a personal email, such as name@gmail.com.",
+    });
+    return;
+  }
+
+  const expectedDomain = KNOWN_EMAIL_DOMAIN_TYPOS[domain];
+  if (expectedDomain) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Check the email domain. Did you mean @${expectedDomain}?`,
+    });
+    return;
+  }
+
+  // Catch one-character errors and adjacent transpositions for common personal providers.
+  const transposeDistance = (left: string, right: string) => {
+    if (left.length !== right.length) return Infinity;
+    const differences: number[] = [];
+    for (let i = 0; i < left.length; i += 1) if (left[i] !== right[i]) differences.push(i);
+    if (differences.length === 1) return 1;
+    if (differences.length === 2 && differences[1] === differences[0] + 1) {
+      const first = differences[0];
+      return left[first] === right[first + 1] && left[first + 1] === right[first] ? 1 : Infinity;
+    }
+    return Infinity;
+  };
+  const closeDomain = PERSONAL_EMAIL_DOMAINS.find((candidate) => transposeDistance(domain, candidate) === 1);
+  if (closeDomain) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Check the email domain. Did you mean @${closeDomain}?`,
+    });
+  }
+});
+
 export const personNameSchema = z
   .string()
   .trim()

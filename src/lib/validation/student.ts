@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import {
-  emailSchema,
+  studentEmailSchema,
   githubProfileUrlSchema,
   linkedinUrlSchema,
   organisationNameSchema,
@@ -23,7 +23,7 @@ const currentYear = new Date().getFullYear();
 
 export const studentRegistrationSchema = z.object({
   fullName: personNameSchema,
-  email: emailSchema,
+  email: studentEmailSchema,
   mobile: phoneSchema,
   college: organisationNameSchema,
   university: organisationNameSchema.optional(),

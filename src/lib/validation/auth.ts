@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { emailSchema } from "./common";
+import { emailSchema, studentEmailSchema } from "./common";
 
 /**
  * Authentication inputs.
@@ -19,7 +19,7 @@ const antiBotFields = {
 };
 
 export const otpRequestSchema = z.object({
-  email: emailSchema,
+  email: studentEmailSchema,
   purpose: z.enum(OTP_PURPOSES).default("STUDENT_REGISTER"),
   ...antiBotFields,
 });
