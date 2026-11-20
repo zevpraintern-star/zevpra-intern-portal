@@ -80,15 +80,15 @@ export const FALLBACK_EMAIL_TEMPLATES: Record<string, EmailTemplateDefinition> =
   otp_code: {
     key: "otp_code",
     name: "Email OTP",
-    subject: "{{companyName}} verification code",
-    bodyHtml: shell("Your one-time code", [
+    subject: "{{companyName}} {{purposeLabel}} OTP",
+    bodyHtml: shell("Your {{purposeLabel}} OTP", [
       "Hello {{recipientName}},",
-      "Use the code below to continue. It expires in {{expiryMinutes}} minutes.",
+      "This code is to {{purposeAction}}. It expires in {{expiryMinutes}} minutes.",
       '<span style="font-size:28px;letter-spacing:6px;font-weight:bold">{{code}}</span>',
       "If you did not request this code you can ignore this email.",
     ]),
     bodyText:
-      "Your {{companyName}} verification code is {{code}}. It expires in {{expiryMinutes}} minutes.",
+      "Your {{companyName}} {{purposeLabel}} OTP is {{code}}. Use it to {{purposeAction}}. It expires in {{expiryMinutes}} minutes.",
   },
   welcome: {
     key: "welcome",

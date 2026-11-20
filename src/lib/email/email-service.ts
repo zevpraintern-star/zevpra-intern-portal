@@ -4,6 +4,7 @@ import { getPrisma } from "../db/prisma";
 import { logger } from "../logger";
 import {
   baseEmailVariables,
+  escapeHtml,
   getFallbackTemplate,
   renderTemplate,
   type EmailVariables,
@@ -203,12 +204,22 @@ async function prepareMessage(input: SendEmailInput): Promise<PreparedMessage> {
   }
 
   const variables: EmailVariables = { ...baseEmailVariables(), ...(input.variables ?? {}) };
+  let bodyHtml = renderTemplate(template.bodyHtml, variables, true);
+  let bodyText = renderTemplate(template.bodyText, variables, false);
+  // OTP templates can be admin-customised and cached in the database. Add the
+  // purpose explicitly at send time too, so older saved templates remain clear.
+  if (input.templateKey === "otp_code" && typeof variables.purposeAction === "string") {
+    const label = typeof variables.purposeLabel === "string" ? variables.purposeLabel : "verification";
+    const purposeHtml = `<p style="margin:0 0 12px"><strong>This is your ${escapeHtml(label)} OTP. Use it to ${escapeHtml(variables.purposeAction)}.</strong></p>`;
+    bodyHtml = bodyHtml.replace(/(<div\b[^>]*>)/i, `$1${purposeHtml}`);
+    bodyText = `This is your ${label} OTP. Use it to ${variables.purposeAction}.\n\n${bodyText}`;
+  }
 
   return {
     to: input.to,
     subject: renderTemplate(input.subjectOverride ?? template.subject, variables, false),
-    html: renderTemplate(template.bodyHtml, variables, true),
-    text: renderTemplate(template.bodyText, variables, false),
+    html: bodyHtml,
+    text: bodyText,
   };
 }
 

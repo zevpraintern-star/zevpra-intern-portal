@@ -29,6 +29,14 @@ export interface VerifyOtpParams {
   ipAddress?: string;
 }
 
+const OTP_PURPOSE_COPY: Record<OtpPurpose, { label: string; action: string }> = {
+  STUDENT_REGISTER: { label: "sign-up", action: "create your student account" },
+  STUDENT_LOGIN: { label: "student sign-in", action: "sign in to your student account" },
+  ADMIN_LOGIN: { label: "admin sign-in", action: "sign in to your admin account" },
+  EMAIL_VERIFY: { label: "email verification", action: "verify your email address" },
+  PASSWORD_RESET: { label: "password reset", action: "reset your password" },
+};
+
 /**
  * Requests an OTP: enforces rate limits, stores the HMAC digest, and dispatches the email.
  */
@@ -166,10 +174,13 @@ export async function requestOtp(params: RequestOtpParams): Promise<{ success: b
     emailResult = await sendEmailNow({
       to: normalisedEmail,
       templateKey: "otp_code",
+      subjectOverride: "{{companyName}} {{purposeLabel}} OTP",
       variables: {
         code: generated.code,
         expiryMinutes: env.OTP_TTL_MINUTES,
         recipientName: "Learner",
+        purposeLabel: OTP_PURPOSE_COPY[params.purpose].label,
+        purposeAction: OTP_PURPOSE_COPY[params.purpose].action,
       },
       userId: existingUser?.id,
     });
