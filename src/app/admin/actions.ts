@@ -23,7 +23,9 @@ import { reviewTaskSubmission } from "@/server/services/tasks";
 async function ctx(permission: string) {
   const staff = await requireStaff(permission);
   const meta = requestMeta(await headers());
-  return { staff, actor: actorOf(staff, meta) };
+  const actor = actorOf(staff, meta);
+  await audit(actor, "USER_ACTIVITY", "AdminAction", null, { operation: permission, outcome: "attempted" });
+  return { staff, actor };
 }
 
 const lines = (form: FormData, key: string): string[] =>

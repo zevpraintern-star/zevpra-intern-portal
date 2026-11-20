@@ -10,6 +10,7 @@ import {
 } from "@/components/dashboard/primitives";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Alert } from "@/components/ui/alert";
+import { SearchableRegion } from "@/components/dashboard/searchable-region";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -21,6 +22,7 @@ import {
 import {
   difficultyLabel,
   groupProjectsByDifficulty,
+  projectDurationLabel,
 } from "@/lib/difficulty";
 import { requireStudentPage } from "@/lib/auth/guards";
 import { getActiveApplication } from "@/server/services/applications";
@@ -136,7 +138,7 @@ export default async function ProjectsPage({
       ) : null}
 
       {!selected ? (
-        <div className="space-y-8">
+        <SearchableRegion className="space-y-8" placeholder="Search projects, skills, requirements…">
           {visibleProjects.length === 0 ? (
             <EmptyState title="No projects are published for your internship yet" />
           ) : (
@@ -154,7 +156,7 @@ export default async function ProjectsPage({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     {groups.easy.map((project) => (
-                      <Card key={project.id}>
+                      <Card key={project.id} data-search-item>
                         <CardHeader>
                           <CardTitle>{project.title}</CardTitle>
                         </CardHeader>
@@ -184,6 +186,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -220,7 +223,7 @@ export default async function ProjectsPage({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     {groups.medium.map((project) => (
-                      <Card key={project.id}>
+                      <Card key={project.id} data-search-item>
                         <CardHeader>
                           <CardTitle>{project.title}</CardTitle>
                         </CardHeader>
@@ -250,6 +253,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -286,7 +290,7 @@ export default async function ProjectsPage({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     {groups.hard.map((project) => (
-                      <Card key={project.id}>
+                      <Card key={project.id} data-search-item>
                         <CardHeader>
                           <CardTitle>{project.title}</CardTitle>
                         </CardHeader>
@@ -316,6 +320,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -340,7 +345,7 @@ export default async function ProjectsPage({
               ) : null}
             </>
           )}
-        </div>
+        </SearchableRegion>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           <Card>
@@ -351,6 +356,7 @@ export default async function ProjectsPage({
               <p className="whitespace-pre-wrap">
                 {selected.description}
               </p>
+              <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(selected.difficulty)}</p>
 
               {selected.requirements.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-5 text-muted-foreground">

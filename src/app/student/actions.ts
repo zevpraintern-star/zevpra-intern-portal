@@ -16,16 +16,19 @@ import { applyToProgram, withdrawApplication } from "@/server/services/applicati
 import { selectProject, submitProject } from "@/server/services/projects";
 import { submitTask } from "@/server/services/tasks";
 import { markAllRead, markRead } from "@/server/services/notifications";
+import { audit } from "@/server/services/audit";
 
-async function context() {
+async function context(operation: string) {
   const student = await requireStudent();
   const meta = requestMeta(await headers());
-  return { student, actor: { userId: student.userId, role: "STUDENT", ...meta } };
+  const actor = { userId: student.userId, role: "STUDENT", ...meta };
+  await audit(actor, "USER_ACTIVITY", "StudentAction", null, { operation, outcome: "attempted" });
+  return { student, actor };
 }
 
 export async function applyAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student, actor } = await context();
+    const { student, actor } = await context("application.apply");
     await applyToProgram(student.userId, { programId: str(form, "programId") as string, motivation: str(form, "motivation") }, actor);
     revalidatePath("/student", "layout");
     redirect("/student/internship?flash=applied");
@@ -34,7 +37,7 @@ export async function applyAction(_: ActionState, form: FormData): Promise<Actio
 
 export async function withdrawAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student } = await context();
+    const { student } = await context("application.withdraw");
     await withdrawApplication(student.userId, str(form, "applicationId") ?? "");
     revalidatePath("/student", "layout");
     return "Application withdrawn.";
@@ -43,7 +46,7 @@ export async function withdrawAction(_: ActionState, form: FormData): Promise<Ac
 
 export async function submitTaskAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student, actor } = await context();
+    const { student, actor } = await context("task.submit");
     await submitTask(student.userId, {
       taskId: str(form, "taskId") as string, githubUrl: str(form, "githubUrl"), liveUrl: str(form, "liveUrl"),
       explanation: str(form, "explanation"), textAnswer: str(form, "textAnswer"), hoursSpent: num(form, "hoursSpent"),
@@ -55,7 +58,7 @@ export async function submitTaskAction(_: ActionState, form: FormData): Promise<
 
 export async function selectProjectAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student, actor } = await context();
+    const { student, actor } = await context("project.select");
     await selectProject(student.userId, { applicationId: str(form, "applicationId") as string, projectId: str(form, "projectId") as string }, actor);
     revalidatePath("/student", "layout");
     redirect("/student/projects?flash=project_selected");
@@ -64,7 +67,7 @@ export async function selectProjectAction(_: ActionState, form: FormData): Promi
 
 export async function submitProjectAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student, actor } = await context();
+    const { student, actor } = await context("project.submit");
     await submitProject(student.userId, str(form, "applicationId") as string, {
       projectId: str(form, "projectId") as string, githubUrl: str(form, "githubUrl") as string, liveUrl: str(form, "liveUrl"), notes: str(form, "notes"),
     } as never, actor);
@@ -79,7 +82,7 @@ const profileSchema = studentRegistrationSchema
 
 export async function updateProfileAction(_: ActionState, form: FormData): Promise<ActionState> {
   return runAction(async () => {
-    const { student } = await context();
+    const { student } = await context("profile.update");
     const data = profileSchema.parse({
       fullName: str(form, "fullName"), mobile: str(form, "mobile"), college: str(form, "college"), university: str(form, "university"),
       degree: str(form, "degree"), branch: str(form, "branch"), yearOfStudy: str(form, "yearOfStudy"), graduationYear: str(form, "graduationYear"),
@@ -102,7 +105,7 @@ export async function updateProfileAction(_: ActionState, form: FormData): Promi
 }
 
 export async function markNotificationAction(form: FormData): Promise<void> {
-  const { student } = await context();
+  const { student } = await context("notifications.mark_read");
   const id = str(form, "id");
   if (id) await markRead(student.userId, id);
   else await markAllRead(student.userId);
@@ -110,7 +113,7 @@ export async function markNotificationAction(form: FormData): Promise<void> {
 }
 
 export async function signOutEverywhereAction(): Promise<void> {
-  const { student } = await context();
+  const { student } = await context("sessions.sign_out_everywhere");
   await getPrisma().session.updateMany({ where: { userId: student.userId, kind: "STUDENT", revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "signed_out_everywhere" } });
   await clearSessionCookie("STUDENT");
   redirect("/login");

@@ -18,7 +18,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
   const unread = await unreadCount(student.userId);
   const nav = STUDENT_NAV.map((item) => ({ ...item, badge: item.key === "notifications" ? unread : undefined }));
   return (
-    <DashboardShell nav={nav} title="Student portal" user={student.name ?? student.email} logoutHref="/login" brand={getBranding().companyName}>
+    <DashboardShell nav={nav} title="Student portal" user={student.name ?? student.email} dashboardHref="/student/dashboard" logoutHref="/login" brand={getBranding().companyName}>
       {children}
     </DashboardShell>
   );

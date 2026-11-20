@@ -209,14 +209,19 @@ export async function getOwnApplication(studentId: string, applicationId: string
 }
 
 export async function getActiveApplication(studentId: string, applicationId?: string | null) {
-  const apps = await getPrisma().application.findMany({
-    where: { studentId, status: "APPROVED" },
+  const prisma = getPrisma();
+  const include = { program: true, domain: { select: { name: true } } } as const;
+  const base = { studentId, status: "APPROVED" as const };
+  if (applicationId) {
+    const chosen = await prisma.application.findFirst({ where: { ...base, id: applicationId }, include });
+    if (chosen) return { active: chosen, all: [chosen] };
+  }
+  const active = await prisma.application.findFirst({
+    where: { ...base, completionStatus: { not: "COMPLETED" } },
     orderBy: { createdAt: "desc" },
-    include: { program: true, domain: { select: { name: true } } },
-  });
-  if (apps.length === 0) return { active: null, all: apps };
-  const chosen = applicationId ? apps.find((a) => a.id === applicationId) : apps.find((a) => a.completionStatus !== "COMPLETED") ?? apps[0];
-  return { active: chosen ?? apps[0] ?? null, all: apps };
+    include,
+  }) ?? await prisma.application.findFirst({ where: base, orderBy: { createdAt: "desc" }, include });
+  return { active, all: active ? [active] : [] };
 }
 
 export function assertApproved(application: { status: string }): void {

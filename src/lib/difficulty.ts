@@ -35,6 +35,24 @@ export function difficultyLabel(
   return DIFFICULTY_TIERS[level].label;
 }
 
+/** Suggested focused work time for one task at each difficulty tier. */
+export function taskDurationLabel(level: DifficultyLevel): string {
+  switch (level) {
+    case "ADVANCED": return "8–12 hours";
+    case "INTERMEDIATE": return "4–6 hours";
+    case "BEGINNER": return "2–3 hours";
+  }
+}
+
+/** Suggested calendar time for a final project at each difficulty tier. */
+export function projectDurationLabel(level: DifficultyLevel): string {
+  switch (level) {
+    case "ADVANCED": return "2–4 weeks";
+    case "INTERMEDIATE": return "1–2 weeks";
+    case "BEGINNER": return "3–5 days";
+  }
+}
+
 /** Maps a difficulty level to a printed certificate template key. */
 export function difficultyTierKey(
   level: DifficultyLevel,

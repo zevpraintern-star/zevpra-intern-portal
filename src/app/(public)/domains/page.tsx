@@ -5,6 +5,7 @@ import { PageHero } from "@/components/layout/page-hero";
 import { Reveal } from "@/components/motion/reveal";
 import { SpotlightCard } from "@/components/motion/spotlight-card";
 import { getDomainGroups } from "@/server/queries/domains";
+import { SearchableRegion } from "@/components/dashboard/searchable-region";
 
 export const revalidate = 3600;
 
@@ -24,7 +25,7 @@ export default async function DomainsPage() {
         description="Each domain has its own tasks and projects. The list is managed by administrators, so it always reflects what is currently open."
       />
 
-      <div className="container-page space-y-20 py-16 sm:py-24">
+      <SearchableRegion className="container-page space-y-20 py-16 sm:py-24" placeholder="Search domains…">
         {groups.map((group, groupIndex) => (
           <section
             key={group.slug}
@@ -54,7 +55,7 @@ export default async function DomainsPage() {
             {group.domains.length > 0 ? (
               <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {group.domains.map((domain) => (
-                  <li key={domain.slug}>
+                  <li key={domain.slug} data-search-item>
                     <Link href="/internships" className="group block rounded-xl">
                       <SpotlightCard
                         tilt={5}
@@ -74,7 +75,7 @@ export default async function DomainsPage() {
             )}
           </section>
         ))}
-      </div>
+      </SearchableRegion>
     </>
   );
 }

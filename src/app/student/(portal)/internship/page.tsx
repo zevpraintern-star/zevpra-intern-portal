@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/utils/format";
 import { listOpenPrograms } from "@/server/services/applications";
 import { Flash } from "@/components/dashboard/flash";
 import { applyAction, withdrawAction } from "@/app/student/actions";
+import { SearchableRegion } from "@/components/dashboard/searchable-region";
 
 export default async function InternshipPage({ searchParams }: { searchParams: Promise<{ flash?: string }> }) {
   const { flash } = await searchParams;
@@ -48,9 +49,10 @@ export default async function InternshipPage({ searchParams }: { searchParams: P
       <h2 className="mb-3 mt-10 font-display text-lg font-semibold">Open internships</h2>
       {!open.hasPreferredDomain ? <EmptyState title="Choose your internship domain">Update your profile with your preferred domain to see matching internships. <Link className="text-primary underline" href="/student/profile">Update profile</Link></EmptyState>
       : available.length === 0 ? <EmptyState title="Nothing new to apply to right now" /> : (
+        <SearchableRegion className="space-y-4" placeholder="Search internships, domains, skills…">
         <div className="grid gap-4 md:grid-cols-2">
           {available.map((p) => (
-            <Card key={p.id}>
+            <Card key={p.id} data-search-item>
               <CardHeader><CardTitle>{p.title}</CardTitle><CardDescription>{p.domain.name} · {p.durationLabel} · {p.difficulty.toLowerCase()}</CardDescription></CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">{p.summary}</p>
@@ -64,6 +66,7 @@ export default async function InternshipPage({ searchParams }: { searchParams: P
             </Card>
           ))}
         </div>
+        </SearchableRegion>
       )}
     </>
   );

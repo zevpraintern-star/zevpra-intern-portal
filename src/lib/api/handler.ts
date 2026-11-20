@@ -15,10 +15,34 @@ type Handler<Ctx> = (req: NextRequest, ctx: Ctx, meta: ReturnType<typeof request
 export function route<Ctx = unknown>(handler: Handler<Ctx>, options: { mutating?: boolean } = {}) {
   return async (req: NextRequest, ctx: Ctx): Promise<Response> => {
     const meta = requestMeta(req.headers);
+    const path = new URL(req.url).pathname;
+    const authAttempt = path.startsWith("/api/auth/") && req.method !== "GET";
+    let authEmail: string | undefined;
+    if (authAttempt) {
+      try {
+        const body = await req.clone().json() as { email?: unknown };
+        if (typeof body.email === "string") authEmail = body.email.trim().toLowerCase().slice(0, 255);
+      } catch {
+        // Malformed request bodies still get recorded without guessing an identity.
+      }
+    }
     try {
       if (options.mutating ?? !["GET", "HEAD", "OPTIONS"].includes(req.method)) assertSameOrigin(req.headers);
-      return await handler(req, ctx, meta);
+      const response = await handler(req, ctx, meta);
+      if (authAttempt) await securityEvent("AUTHENTICATION_ATTEMPT", response.ok ? "LOW" : "MEDIUM", {
+        email: authEmail,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        detail: { path, method: req.method, outcome: response.ok ? "success" : "failure", status: response.status },
+      });
+      return response;
     } catch (error) {
+      if (authAttempt) await securityEvent("AUTHENTICATION_ATTEMPT", "MEDIUM", {
+        email: authEmail,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        detail: { path, method: req.method, outcome: "failure", reason: isAppError(error) ? error.code : "unexpected_error" },
+      });
       if (isAppError(error)) {
         const type = error.code === "FORBIDDEN" ? "AUTHORIZATION_FAILURE" : error.code === "CSRF_FAILED" ? "CSRF_FAILURE" : error.code === "RATE_LIMITED" ? "RATE_LIMIT_EXCEEDED" : null;
         if (type) await securityEvent(type, type === "AUTHORIZATION_FAILURE" ? "MEDIUM" : "LOW", { ipAddress: meta.ipAddress, userAgent: meta.userAgent, detail: { path: new URL(req.url).pathname, method: req.method } });

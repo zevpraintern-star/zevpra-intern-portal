@@ -29,10 +29,23 @@ export function WorldCanvas() {
   const { resolvedTheme } = useTheme();
   const { mode, preference, setPreference, reducedMotion } = useWorldMode();
   const [ready, setReady] = useState(false);
+  const [sceneEnabled, setSceneEnabled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const live = mode === "full" || mode === "lite";
   useScrollDriver(live);
+
+  // Let the server-rendered page hydrate and respond before downloading/starting WebGL.
+  useEffect(() => {
+    if (!live) {
+      setSceneEnabled(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSceneEnabled(true), 800);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [live]);
 
   const theme = resolvedTheme === "light" ? "light" : "dark";
 
@@ -46,7 +59,7 @@ export function WorldCanvas() {
         <div className={cn("absolute inset-0 transition-opacity duration-1000", live && ready ? "opacity-0" : "opacity-100")}>
           <StaticBackdrop />
         </div>
-        {live ? (
+        {live && sceneEnabled ? (
           <div className={cn("absolute inset-0 transition-opacity duration-1000", ready ? "opacity-100" : "opacity-0")}>
             <WorldScene
               key={mode}

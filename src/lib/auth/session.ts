@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { COOKIE_NAMES, SESSION } from "@/lib/config/constants";
 import { getEnv } from "@/lib/config/env";
 import { getPrisma } from "@/lib/db/prisma";
@@ -93,7 +94,7 @@ export async function clearSessionCookie(kind: SessionKind): Promise<void> {
  * Validates the session token from the cookie or passed token string,
  * checks revocation and expiration, and touches `lastSeenAt` if appropriate.
  */
-export async function getSession(
+async function getSessionUncached(
   kind: SessionKind = "STUDENT",
   providedToken?: string,
 ): Promise<ActiveSession | null> {
@@ -158,6 +159,9 @@ export async function getSession(
     user: session.user,
   };
 }
+
+/** Reuse session validation when both a route layout and its page guard run in one render. */
+export const getSession = cache(getSessionUncached);
 
 /**
  * Revokes a session by ID.

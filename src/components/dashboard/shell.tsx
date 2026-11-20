@@ -14,11 +14,21 @@ export interface NavItem { key: string; label: string; href: string; badge?: num
  * Sidebar + mobile drawer shared by the student portal and the admin panel.
  * Navigation here is only convenience: every page and action re-checks authorisation on the server.
  */
-export function DashboardShell({ nav, title, user, children, logoutHref, brand }: { nav: NavItem[]; title: string; user: string; children: ReactNode; logoutHref: string; brand: string }) {
+export function DashboardShell({ nav, title, user, children, logoutHref, dashboardHref, brand }: { nav: NavItem[]; title: string; user: string; children: ReactNode; logoutHref: string; dashboardHref: string; brand: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+    if (pathname.startsWith("/admin/") || pathname.startsWith("/student/")) {
+      void fetch("/api/activity", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: pathname }),
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+  }, [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -47,7 +57,7 @@ export function DashboardShell({ nav, title, user, children, logoutHref, brand }
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[17rem_1fr]">
       <aside className="hidden border-r border-border bg-card/40 p-4 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto">
-        <Logo name={brand} />
+        <Logo name={brand} href={dashboardHref} />
         <p className="mt-6 px-3 text-xs text-muted-foreground">{title}</p>
         <p className="mb-3 truncate px-3 text-sm font-medium">{user}</p>
         {links}
@@ -55,7 +65,7 @@ export function DashboardShell({ nav, title, user, children, logoutHref, brand }
 
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
-          <Logo name={brand} />
+          <Logo name={brand} href={dashboardHref} />
           <button type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="rounded-md p-2 hover:bg-accent"><Menu className="size-5" /></button>
         </header>
         {open ? (

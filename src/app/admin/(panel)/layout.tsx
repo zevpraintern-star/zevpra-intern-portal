@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   };
   const nav = ADMIN_NAV.filter((n) => !n.permission || can(staff, n.permission)).map((n) => ({ key: n.key, label: n.label, href: n.href, badge: badges[n.key] || undefined }));
   return (
-    <DashboardShell nav={nav} title={staff.primaryRole.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())} user={staff.name ?? staff.email} logoutHref="/admin/login" brand={getBranding().companyName}>
+    <DashboardShell nav={nav} title={staff.primaryRole.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())} user={staff.name ?? staff.email} dashboardHref="/admin/dashboard" logoutHref="/admin/login" brand={getBranding().companyName}>
       {children}
     </DashboardShell>
   );

@@ -12,6 +12,7 @@ import { isAppError } from "@/lib/api/errors";
 import { formatDate, formatDateTime } from "@/lib/utils/format";
 import { getStudentTask } from "@/server/services/tasks";
 import { submitTaskAction } from "@/app/student/actions";
+import { taskDurationLabel } from "@/lib/difficulty";
 
 export default async function TaskPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ flash?: string }> }) {
   const { flash } = await searchParams;
@@ -30,13 +31,13 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   return (
     <>
       <Flash flash={flash} />
-      <PageHeader title={task.title} description={`${task.difficulty.toLowerCase()} · ${task.points} points`} actions={<StatusBadge value={assignment.status} />} />
+      <PageHeader title={task.title} description={`${task.difficulty.toLowerCase()} · ${taskDurationLabel(task.difficulty)} estimated · ${task.points} points`} actions={<StatusBadge value={assignment.status} />} />
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <div className="space-y-6">
           <Card><CardHeader><CardTitle>Instructions</CardTitle></CardHeader><CardContent className="space-y-4 text-sm leading-relaxed">
             <p className="whitespace-pre-wrap">{task.description}</p>
             {task.instructions ? <p className="whitespace-pre-wrap text-muted-foreground">{task.instructions}</p> : null}
-            <DefinitionList items={[["Deadline", deadline ? formatDateTime(deadline) : "No deadline"], ["Attempts", `${submissions.length} of ${task.maxAttempts} used`], ["Submit as", type.replaceAll("_", " ").toLowerCase()]]} />
+            <DefinitionList items={[["Estimated effort", taskDurationLabel(task.difficulty)], ["Deadline", deadline ? formatDateTime(deadline) : "No deadline"], ["Attempts", `${submissions.length} of ${task.maxAttempts} used`], ["Submit as", type.replaceAll("_", " ").toLowerCase()]]} />
           </CardContent></Card>
 
           {submissions.length > 0 ? (

@@ -175,6 +175,7 @@ enum AnnouncementAudience {
 }
 
 enum AuditAction {
+  USER_ACTIVITY
   ADMIN_LOGIN
   ADMIN_LOGOUT
   STUDENT_REGISTERED
@@ -218,6 +219,8 @@ enum AuditAction {
 }
 
 enum SecurityEventType {
+  AUTHENTICATION_ATTEMPT
+  USER_ACTIVITY
   OTP_FAILURE
   RATE_LIMIT_EXCEEDED
   AUTHORIZATION_FAILURE

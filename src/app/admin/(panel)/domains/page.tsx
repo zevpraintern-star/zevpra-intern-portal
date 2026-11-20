@@ -5,21 +5,24 @@ import { CheckField, SelectField, TextArea, TextField } from "@/components/forms
 import { PageHeader, Table, Td, Th } from "@/components/dashboard/primitives";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { requireStaffPage } from "@/lib/auth/guards";
 import { getPrisma } from "@/lib/db/prisma";
 import { deleteDomainAction, saveCategoryAction, saveDomainAction } from "@/app/admin/actions";
 
-export default async function DomainsAdmin({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+export default async function DomainsAdmin({ searchParams }: { searchParams: Promise<{ edit?: string; q?: string }> }) {
   await requireStaffPage("domains.manage");
-  const { edit } = await searchParams;
+  const { edit, q } = await searchParams;
+  const query = q?.trim();
   const [cats, domains] = await Promise.all([
     getPrisma().domainCategory.findMany({ orderBy: { sortOrder: "asc" } }),
-    getPrisma().domain.findMany({ orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }], include: { category: { select: { name: true } }, _count: { select: { programs: true } } } }),
+    getPrisma().domain.findMany({ where: query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { shortDescription: { contains: query, mode: "insensitive" } }, { description: { contains: query, mode: "insensitive" } }, { category: { name: { contains: query, mode: "insensitive" } } }] } : undefined, orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }], include: { category: { select: { name: true } }, _count: { select: { programs: true } } } }),
   ]);
   const d = edit ? domains.find((x) => x.id === edit) : undefined;
   return (
     <>
       <PageHeader title="Domains" description="Changes appear on the public site within an hour, with no deploy." />
+      <form role="search" className="mb-4 flex max-w-lg gap-2"><Input type="search" name="q" defaultValue={q} placeholder="Search domains or categories…" aria-label="Search domains" /><SubmitButton>Search</SubmitButton></form>
       <Table label="Domains"><thead><tr><Th>Domain</Th><Th>Category</Th><Th>Status</Th><Th>Internships</Th><Th /></tr></thead><tbody>
         {domains.map((x) => (<tr key={x.id}><Td className="font-medium">{x.name}</Td><Td>{x.category.name}</Td><Td><StatusBadge value={x.isActive ? "ACTIVE" : "ARCHIVED"} /></Td><Td>{x._count.programs}</Td>
           <Td className="space-x-3 whitespace-nowrap"><Link className="text-primary hover:underline" href={`?edit=${x.id}#form`}>Edit</Link>
