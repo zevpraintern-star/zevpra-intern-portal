@@ -23,7 +23,9 @@ import {
   difficultyLabel,
   groupProjectsByDifficulty,
   projectDurationLabel,
+  projectDeadlineDays,
 } from "@/lib/difficulty";
+import { formatDateTime } from "@/lib/utils/format";
 import { requireStudentPage } from "@/lib/auth/guards";
 import { getActiveApplication } from "@/server/services/applications";
 import { getProjectStage } from "@/server/services/projects";
@@ -186,7 +188,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
-                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)} · deadline {projectDeadlineDays(project.difficulty)} days after selection</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -253,7 +255,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
-                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)} · deadline {projectDeadlineDays(project.difficulty)} days after selection</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -320,7 +322,7 @@ export default async function ProjectsPage({
                           <Badge variant="outline">
                             {difficultyLabel(project.difficulty)}
                           </Badge>
-                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)}</p>
+                          <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(project.difficulty)} · deadline {projectDeadlineDays(project.difficulty)} days after selection</p>
 
                           <ActionForm action={selectProjectAction}>
                             <input
@@ -357,6 +359,8 @@ export default async function ProjectsPage({
                 {selected.description}
               </p>
               <p className="text-sm text-muted-foreground">Estimated time: {projectDurationLabel(selected.difficulty)}</p>
+              <p className="text-sm text-muted-foreground">Deadline: {selected.deadline ?? active.selectedProjectDueAt ? formatDateTime(selected.deadline ?? active.selectedProjectDueAt!) : "Set after project selection"}</p>
+              {selected.deadline && selected.deadline.getTime() < Date.now() || active.selectedProjectDueAt && active.selectedProjectDueAt.getTime() < Date.now() ? <Alert variant="warning">The deadline passed. You can still submit; 10% of this project&apos;s maximum marks will be deducted if approved.</Alert> : null}
 
               {selected.requirements.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-5 text-muted-foreground">

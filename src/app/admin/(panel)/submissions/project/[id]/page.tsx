@@ -38,7 +38,7 @@ export default async function ReviewProject({ params }: { params: Promise<{ id: 
       <PageHeader title={s.project.title} description={`${s.student.name ?? s.student.email}`} actions={<StatusBadge value={s.status} />} />
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <Card><CardHeader><CardTitle>Submission</CardTitle></CardHeader><CardContent className="space-y-4 text-sm">
-          <DefinitionList items={[["Repository", <a key="r" className="break-all text-primary hover:underline" href={s.githubUrl} target="_blank" rel="noopener noreferrer nofollow">{s.githubUrl}</a>], ["Repository check", <StatusBadge key="c" value={s.repoCheckStatus} />], ["Live URL", s.liveUrl ?? "-"], ["Submitted", formatDateTime(s.submittedAt)]]} />
+          <DefinitionList items={[["Repository", <a key="r" className="break-all text-primary hover:underline" href={s.githubUrl} target="_blank" rel="noopener noreferrer nofollow">{s.githubUrl}</a>], ["Repository check", <StatusBadge key="c" value={s.repoCheckStatus} />], ["Deadline status", s.late ? "Late (10% of project maximum deducted on approval)" : "On time"], ["Current score", s.score === null ? "Not graded" : `${s.score}/${s.project.maxScore}${s.latePenaltyPoints ? ` (−${s.latePenaltyPoints} late penalty)` : ""}`], ["Live URL", s.liveUrl ?? "-"], ["Submitted", formatDateTime(s.submittedAt)]]} />
           {s.repoCheckStatus && !["OK", "PENDING"].includes(s.repoCheckStatus) ? <Alert variant="warning">The automatic check could not confirm this is a public repository ({s.repoCheckStatus.replaceAll("_", " ").toLowerCase()}). Open it before approving.</Alert> : null}
           {s.notes ? <div><p className="text-xs text-muted-foreground">Student notes</p><p className="whitespace-pre-wrap">{s.notes}</p></div> : null}
         </CardContent></Card>
@@ -48,7 +48,7 @@ export default async function ReviewProject({ params }: { params: Promise<{ id: 
               {!canApprove ? <Alert>You can leave feedback. Only an administrator can approve a final project.</Alert> : null}
               <SelectField label="Decision" name="decision" options={options} />
               <TextArea label="Feedback for the student" name="feedback" rows={5} required />
-              <TextField label={`Project marks (required to approve; max ${s.project.maxScore})`} name="score" type="number" min={0} max={s.project.maxScore} step={1} hint="Certificate eligibility requires an overall score greater than 85% across graded tasks and this project." />
+              <TextField label={`Project marks before penalty (max ${s.project.maxScore})`} name="score" type="number" min={0} max={s.project.maxScore} step={1} hint={`${s.late ? `Late submission: 10% (${Math.ceil(s.project.maxScore * 0.1)} marks) will be deducted from this project only. ` : "On-time submission: no deadline penalty. "}Certificate eligibility requires an overall score greater than 85% across graded tasks and this project.`} />
               <SubmitButton>Save decision</SubmitButton></ActionForm>)}{hardTierEnabled && s.project.difficulty === "ADVANCED" ? (
            <details className="pt-3"><summary className="cursor-pointer text-xs text-primary/80">Hard-tier reviewer checklist ({HARD_REVIEW_CHECKLIST.length} items)</summary>
              <ul className="mt-2 space-y-1 border-t text-xs text-muted-foreground">

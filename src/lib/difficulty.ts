@@ -53,6 +53,31 @@ export function projectDurationLabel(level: DifficultyLevel): string {
   }
 }
 
+export function taskDeadlineDays(level: DifficultyLevel): number {
+  switch (level) {
+    case "ADVANCED": return 7;
+    case "INTERMEDIATE": return 5;
+    case "BEGINNER": return 3;
+  }
+}
+
+export function projectDeadlineDays(level: DifficultyLevel): number {
+  switch (level) {
+    case "ADVANCED": return 28;
+    case "INTERMEDIATE": return 14;
+    case "BEGINNER": return 5;
+  }
+}
+
+export function deadlineAfterDays(days: number, from = new Date()): Date {
+  return new Date(from.getTime() + days * 86_400_000);
+}
+
+/** Late work loses 10% of that item's maximum marks; unaffected items keep full marks. */
+export function latePenalty(maxMarks: number, marksEarned: number): number {
+  return Math.min(marksEarned, Math.ceil(maxMarks * 0.1));
+}
+
 /** Maps a difficulty level to a printed certificate template key. */
 export function difficultyTierKey(
   level: DifficultyLevel,

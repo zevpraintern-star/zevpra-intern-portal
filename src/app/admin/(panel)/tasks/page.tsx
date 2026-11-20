@@ -38,7 +38,7 @@ export default async function TasksAdmin({ searchParams }: { searchParams: Promi
           <SelectField label="Difficulty" name="difficulty" defaultValue={t?.difficulty ?? "BEGINNER"} options={["BEGINNER", "INTERMEDIATE", "ADVANCED"].map((v) => ({ value: v, label: v.toLowerCase() }))} />
           <p className="self-center text-sm text-muted-foreground">Estimated effort follows difficulty: Easy 2–3 hours, Medium 4–6 hours, Hard 8–12 hours.</p>
           <SelectField label="Submission type" name="submissionType" defaultValue={t?.submissionType ?? "GITHUB_LINK"} options={["GITHUB_LINK", "LIVE_URL", "TEXT", "FILE", "MIXED"].map((v) => ({ value: v, label: v.replace("_", " ").toLowerCase() }))} />
-          <TextField label="Deadline" name="deadline" type="datetime-local" defaultValue={localInput(t?.deadline)} />
+          <TextField label="Deadline override (optional)" name="deadline" type="datetime-local" defaultValue={localInput(t?.deadline)} hint="Leave blank to assign a difficulty-based deadline: Easy 3 days, Medium 5 days, Hard 7 days after assignment." />
           <TextField label="Maximum attempts" name="maxAttempts" type="number" min={1} max={10} defaultValue={t?.maxAttempts ?? 3} />
           <TextField label="Maximum task marks" name="points" type="number" min={1} max={1000} step={1} defaultValue={t?.points ?? 10} />
           <TextField label="Order" name="sortOrder" type="number" min={0} defaultValue={t?.sortOrder ?? 0} />

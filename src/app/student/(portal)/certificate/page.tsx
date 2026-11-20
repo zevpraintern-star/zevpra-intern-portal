@@ -40,7 +40,7 @@ export default async function CertificatePage({ searchParams }: { searchParams: 
         {releasedCertificates.map((c) => (
           <Card key={c.id}><CardContent className="space-y-5 pt-6">
             <div className="flex items-center justify-between"><div className="flex items-center gap-3"><Award className="size-6 text-primary" aria-hidden="true" /><p className="font-display text-lg font-semibold">{c.snapshotProgramTitle}</p></div><StatusBadge value={c.status} /></div>
-            <DefinitionList items={[["Certificate ID", c.certificateId], ["Domain", c.snapshotDomainName], ["Duration", c.snapshotDuration], ["Issued", c.issueDate ? formatDate(c.issueDate) : "Being generated"]]} />
+            <DefinitionList items={[["Certificate ID", c.certificateId], ["Domain", c.snapshotDomainName], ["Duration", c.snapshotDuration], ["Task score", c.taskScorePercent === null ? "N/A" : `${c.taskScorePercent.toFixed(2)}%`], ["Project score", c.projectScorePercent === null ? "N/A" : `${c.projectScorePercent.toFixed(2)}%`], ["Overall score", c.overallScorePercent === null ? "N/A" : `${c.overallScorePercent.toFixed(2)}%`], ["Issued", c.issueDate ? formatDate(c.issueDate) : "Being generated"]]} />
             {c.status === "REVOKED" ? <Alert variant="destructive">This certificate has been revoked{c.revocationReason ? `: ${c.revocationReason}` : "."}</Alert> : null}
             {c.status === "GENERATED" && c.pdfFileId ? (
               <div className="flex flex-wrap gap-3">

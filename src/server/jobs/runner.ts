@@ -1,6 +1,8 @@
 import { getEnv } from "@/lib/config/env";
 import { getPrisma } from "@/lib/db/prisma";
-import { processEmailJob } from "@/lib/email/email-service";
+import { processEmailJob, queueEmail } from "@/lib/email/email-service";
+import { getBranding } from "@/lib/config/branding";
+import { formatDateTime } from "@/lib/utils/format";
 import { logger } from "@/lib/logger";
 import { scanBuffer, sniffMime } from "@/lib/security/file-scan";
 import { loadPrivateFile } from "@/lib/storage/storage-service";
@@ -54,6 +56,40 @@ async function scanFile(fileId: string): Promise<void> {
   }
 }
 
+async function processDeadlineReminder(payload: Payload): Promise<void> {
+  const prisma = getPrisma();
+  const kind = payload.kind;
+  if (kind === "TASK_DEADLINE_REMINDER") {
+    const taskId = String(payload.taskId ?? "");
+    const studentId = String(payload.studentId ?? "");
+    const assignment = await prisma.taskAssignment.findUnique({
+      where: { taskId_studentId: { taskId, studentId } },
+      select: { status: true, dueAt: true, task: { select: { title: true } }, student: { select: { email: true, name: true } } },
+    });
+    if (!assignment || !assignment.dueAt || !["ASSIGNED", "IN_PROGRESS"].includes(assignment.status) || assignment.dueAt <= new Date()) return;
+    await queueEmail({
+      to: assignment.student.email, userId: studentId, templateKey: "deadline_reminder",
+      variables: { recipientName: assignment.student.name ?? "Student", itemType: "task", itemTitle: assignment.task.title, dueAt: formatDateTime(assignment.dueAt), actionUrl: `${getBranding().appUrl}/student/tasks/${taskId}` },
+    });
+    return;
+  }
+  if (kind === "PROJECT_DEADLINE_REMINDER") {
+    const applicationId = String(payload.applicationId ?? "");
+    const projectId = String(payload.projectId ?? "");
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      select: { status: true, completionStatus: true, studentId: true, selectedProjectId: true, selectedProjectDueAt: true, selectedProject: { select: { title: true } }, student: { select: { email: true, name: true } } },
+    });
+    if (!application || !application.selectedProject || application.selectedProjectId !== projectId || application.status !== "APPROVED" || application.completionStatus !== "IN_PROGRESS" || !application.selectedProjectDueAt || application.selectedProjectDueAt <= new Date()) return;
+    const submission = await prisma.projectSubmission.findUnique({ where: { projectId_studentId: { projectId, studentId: application.studentId } }, select: { id: true } });
+    if (submission) return;
+    await queueEmail({
+      to: application.student.email, userId: application.studentId, templateKey: "deadline_reminder",
+      variables: { recipientName: application.student.name ?? "Student", itemType: "project", itemTitle: application.selectedProject.title, dueAt: formatDateTime(application.selectedProjectDueAt), actionUrl: `${getBranding().appUrl}/student/projects` },
+    });
+  }
+}
+
 const HANDLERS: Record<string, (job: { id: string; payload: Payload }) => Promise<void>> = {
   EMAIL: async (job) => {
     const result = await processEmailJob(job.id);
@@ -64,7 +100,7 @@ const HANDLERS: Record<string, (job: { id: string; payload: Payload }) => Promis
   CERTIFICATE_PDF: async (job) => generateCertificate(String(job.payload.certificateId)),
   GITHUB_REPO_CHECK: async (job) => checkRepository(String(job.payload.submissionId)),
   FILE_SCAN: async (job) => scanFile(String(job.payload.fileId)),
-  NOTIFICATION: async () => undefined,
+  NOTIFICATION: async (job) => processDeadlineReminder(job.payload),
   CSV_EXPORT: async () => undefined,
 };
 

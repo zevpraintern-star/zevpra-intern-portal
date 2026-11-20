@@ -2,6 +2,7 @@
 export const ADMIN_NAV: ReadonlyArray<{ key: string; label: string; href: string; permission?: string }> = [
   { key: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { key: "students", label: "Students", href: "/admin/students", permission: "students.view" },
+  { key: "enrollments", label: "Enrollments", href: "/admin/enrollments", permission: "students.view" },
   { key: "applications", label: "Applications", href: "/admin/applications", permission: "applications.review" },
   { key: "submissions", label: "Submissions", href: "/admin/submissions", permission: "tasks.review" },
   { key: "certificates", label: "Certificates", href: "/admin/certificates", permission: "certificates.issue" },

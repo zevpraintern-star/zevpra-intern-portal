@@ -15,6 +15,7 @@ import { getSetting } from "@/server/services/settings";
 import { normalizeTemplateKey, selectCertificateTemplate, type CertificateTemplateKey } from "@/lib/difficulty";
 import type { DifficultyLevel } from "@/generated/prisma/enums";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
+import { approvedTaskMarks, scoreBreakdown } from "@/server/services/scoring";
 
 export type { CertificateTemplateKey };
 
@@ -47,6 +48,7 @@ export async function renderCertificatePdf(cert: {
   certificateId: string; verificationUrl: string; studentName: string; programTitle: string; domainName: string;
   duration: string; completionDate: Date | null; issueDate: Date; companyName: string; disclaimer: string;
   difficulty: DifficultyLevel; templateKey: CertificateTemplateKey;
+  taskScorePercent?: number | null; projectScorePercent?: number | null; overallScorePercent?: number | null;
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([842, 595]);
@@ -143,6 +145,23 @@ export async function renderCertificatePdf(cert: {
     page.drawText(value, { x: x + (colW - sansBold.widthOfTextAtSize(value, valueSize)) / 2, y: panelY + 13, size: valueSize, font: sansBold, color: ink });
   });
 
+  const scoreY = 111;
+  const scoreH = 48;
+  page.drawRectangle({ x: panelX, y: scoreY, width: panelW, height: scoreH, color: paleBlue });
+  const scoreFacts = [
+    { label: "TASK SCORE", value: cert.taskScorePercent },
+    { label: "PROJECT SCORE", value: cert.projectScorePercent },
+    { label: "OVERALL SCORE", value: cert.overallScorePercent },
+  ];
+  scoreFacts.forEach((fact, index) => {
+    const x = panelX + colW * index;
+    const value = fact.value === null || fact.value === undefined ? "N/A" : `${fact.value.toFixed(2)}%`;
+    const valueSize = Math.min(12, (colW - 18) / Math.max(sansBold.widthOfTextAtSize(value, 12) / 12, 1));
+    const labelWidth = sansBold.widthOfTextAtSize(fact.label, 7);
+    page.drawText(fact.label, { x: x + (colW - labelWidth) / 2, y: scoreY + 30, size: 7, font: sansBold, color: muted });
+    page.drawText(value, { x: x + (colW - sansBold.widthOfTextAtSize(value, valueSize)) / 2, y: scoreY + 11, size: valueSize, font: sansBold, color: ink });
+  });
+
   page.drawText(`COMPLETED  ${formatLongDate(cert.completionDate)}`, { x: contentLeft, y: 73, size: 8, font: sans, color: muted });
   page.drawText(`ISSUED  ${formatLongDate(cert.issueDate)}`, { x: contentCenter + 10, y: 73, size: 8, font: sans, color: muted });
   page.drawText(`CERTIFICATE ID  ${safe(sansBold, cert.certificateId)}`, { x: contentLeft, y: 55, size: 8.5, font: sansBold, color: ink });
@@ -197,6 +216,15 @@ export async function releaseFreeCertificate(applicationId: string, actor: Actor
     if (existing?.status === "REVOKED") throw new ConflictError("This certificate was revoked and cannot be released again.");
     if (existing) return { certificate: existing, released: existing.status !== "GENERATED" };
 
+    const taskMarks = await approvedTaskMarks(tx, application);
+    const finalProject = application.selectedProjectId
+      ? await tx.projectSubmission.findUnique({
+          where: { projectId_studentId: { projectId: application.selectedProjectId, studentId: application.studentId } },
+          select: { score: true, project: { select: { maxScore: true } } },
+        })
+      : null;
+    const scores = scoreBreakdown(taskMarks, finalProject?.score ?? 0, finalProject?.project.maxScore ?? 0);
+
     const template = selectCertificateTemplate(await tx.certificateTemplate.findMany(), application.program.difficulty);
     const verificationId = randomCode(CERTIFICATE.verificationIdLength);
     const certificate = await tx.certificate.create({
@@ -214,6 +242,9 @@ export async function releaseFreeCertificate(applicationId: string, actor: Actor
         snapshotDomainName: application.program.domain.name,
         snapshotDuration: application.program.durationLabel,
         snapshotCollege: application.student.studentProfile?.college,
+        taskScorePercent: scores.taskPercent,
+        projectScorePercent: scores.projectPercent,
+        overallScorePercent: scores.overallPercent,
         projectDifficulty: application.program.difficulty,
         completionDate: application.completedAt,
       },
@@ -267,6 +298,7 @@ export async function generateCertificate(certificateRowId: string, options: { f
     certificateId: cert.certificateId, verificationUrl: cert.verificationUrl, studentName: cert.snapshotStudentName,
     programTitle: cert.snapshotProgramTitle, domainName: cert.snapshotDomainName, duration: cert.snapshotDuration,
     completionDate: cert.completionDate, issueDate, companyName: branding.companyName,
+    taskScorePercent: cert.taskScorePercent, projectScorePercent: cert.projectScorePercent, overallScorePercent: cert.overallScorePercent,
     disclaimer: (disclaimer || DEFAULT_DISCLAIMER).replaceAll("{{companyName}}", branding.companyName),
     difficulty: cert.projectDifficulty, templateKey: toTemplateKey(cert.template?.templateKey ?? config.templateKey),
   });

@@ -714,6 +714,7 @@ model Application {
   certificateEligibleById String?       @map("certificate_eligible_by_id") @db.Uuid
   /// Project the student chose after finishing their tasks. Set once, locked after the first submission.
   selectedProjectId    String?          @map("selected_project_id") @db.Uuid
+  selectedProjectDueAt DateTime?        @map("selected_project_due_at") @db.Timestamptz(3)
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -813,6 +814,8 @@ model TaskSubmission {
   reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(3)
   feedback       String?          @db.Text
   pointsAwarded  Int?             @map("points_awarded")
+  late           Boolean          @default(false)
+  latePenaltyPoints Int           @default(0) @map("late_penalty_points")
   submittedAt    DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(3)
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -878,6 +881,8 @@ model ProjectSubmission {
   reviewedAt      DateTime?        @map("reviewed_at") @db.Timestamptz(3)
   feedback        String?          @db.Text
   score           Int?
+  late            Boolean          @default(false)
+  latePenaltyPoints Int            @default(0) @map("late_penalty_points")
   /// Result of the asynchronous repository check (JobType.GITHUB_REPO_CHECK).
   repoCheckStatus String?          @map("repo_check_status") @db.VarChar(30)
   repoCheckedAt   DateTime?        @map("repo_checked_at") @db.Timestamptz(3)
@@ -1062,6 +1067,9 @@ model Certificate {
   snapshotDomainName  String            @map("snapshot_domain_name") @db.VarChar(160)
   snapshotDuration    String            @map("snapshot_duration") @db.VarChar(60)
   snapshotCollege     String?           @map("snapshot_college") @db.VarChar(200)
+  taskScorePercent   Float?            @map("task_score_percent")
+  projectScorePercent Float?           @map("project_score_percent")
+  overallScorePercent Float?           @map("overall_score_percent")
   completionDate      DateTime?         @map("completion_date") @db.Timestamptz(3)
   issueDate           DateTime?         @map("issue_date") @db.Timestamptz(3)
   pdfFileId           String?           @unique @map("pdf_file_id") @db.Uuid

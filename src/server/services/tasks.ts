@@ -8,6 +8,7 @@ import { audit, type Actor } from "@/server/services/audit";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { refreshProgress, taskScope } from "@/server/services/progress";
 import { enforceGithubRequirement } from "@/lib/validation/submission";
+import { deadlineAfterDays, latePenalty, taskDeadlineDays } from "@/lib/difficulty";
 
 const OPEN: ReadonlyArray<string> = ["SUBMITTED", "UNDER_REVIEW"];
 
@@ -18,13 +19,13 @@ export async function listStudentTasks(studentId: string, application: { program
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true, title: true, slug: true, difficulty: true, deadline: true, maxAttempts: true, points: true, submissionType: true,
-      assignments: { where: { studentId }, select: { status: true, dueAt: true } },
-      submissions: { where: { studentId }, orderBy: { attemptNumber: "desc" }, take: 1, select: { status: true, attemptNumber: true, feedback: true } },
+      assignments: { where: { studentId }, select: { status: true, dueAt: true, assignedAt: true } },
+      submissions: { where: { studentId }, orderBy: { attemptNumber: "desc" }, take: 1, select: { status: true, attemptNumber: true, feedback: true, late: true, pointsAwarded: true, latePenaltyPoints: true } },
     },
   });
   return tasks.map((t) => ({
     id: t.id, title: t.title, difficulty: t.difficulty, points: t.points, maxAttempts: t.maxAttempts,
-    dueAt: t.assignments[0]?.dueAt ?? t.deadline,
+    dueAt: t.assignments[0]?.dueAt ?? t.deadline ?? deadlineAfterDays(taskDeadlineDays(t.difficulty), t.assignments[0]?.assignedAt),
     assignmentStatus: t.assignments[0]?.status ?? "ASSIGNED",
     latest: t.submissions[0] ?? null,
   }));
@@ -49,8 +50,7 @@ export async function submitTask(studentId: string, input: z.infer<typeof taskSu
   const prisma = getPrisma();
   const { assignment, task, submissions } = await getStudentTask(studentId, data.taskId);
 
-  const deadline = assignment.dueAt ?? task.deadline;
-  if (deadline && deadline.getTime() < Date.now()) throw new ValidationError("The deadline for this task has passed.");
+  const deadline = assignment.dueAt ?? task.deadline ?? deadlineAfterDays(taskDeadlineDays(task.difficulty), assignment.assignedAt);
   const latest = submissions[0];
   if (latest && OPEN.includes(latest.status)) throw new ConflictError("Your previous submission is still awaiting review.");
   if (latest?.status === "APPROVED") throw new ConflictError("This task is already approved.");
@@ -74,11 +74,13 @@ export async function submitTask(studentId: string, input: z.infer<typeof taskSu
   let created;
   try {
     created = await prisma.$transaction(async (tx) => {
+      const submittedAt = new Date();
       const row = await tx.taskSubmission.create({
         data: {
           taskId: task.id, studentId, attemptNumber: submissions.length + 1,
           githubUrl: data.githubUrl, liveUrl: data.liveUrl, explanation: data.explanation,
-          textAnswer: data.textAnswer, hoursSpent: data.hoursSpent,
+          textAnswer: data.textAnswer, hoursSpent: data.hoursSpent, submittedAt,
+          late: submittedAt.getTime() > deadline.getTime(),
         },
       });
       await tx.taskAssignment.update({ where: { id: assignment.id }, data: { status: "SUBMITTED" } });
@@ -117,12 +119,17 @@ export async function reviewTaskSubmission(actor: Actor, input: z.infer<typeof r
     }
   }
 
+  const penalty = data.decision === "APPROVED" && submission.late
+    ? latePenalty(submission.task.points, data.pointsAwarded ?? 0)
+    : 0;
+  const awarded = data.decision === "APPROVED" ? Math.max(0, (data.pointsAwarded ?? 0) - penalty) : (data.pointsAwarded ?? 0);
   const { application, progress } = await prisma.$transaction(async (tx) => {
     const claimed = await tx.taskSubmission.updateMany({
       where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
       data: {
         status: data.decision, feedback: data.feedback, reviewedById: actor.userId ?? null, reviewedAt: new Date(),
-        pointsAwarded: data.decision === "APPROVED" ? data.pointsAwarded! : (data.pointsAwarded ?? 0),
+        pointsAwarded: awarded,
+        latePenaltyPoints: penalty,
       },
     });
     if (claimed.count === 0) throw new ConflictError("This submission was already reviewed.");
@@ -141,13 +148,13 @@ export async function reviewTaskSubmission(actor: Actor, input: z.infer<typeof r
 
   revalidatePath("/student", "layout");
   revalidatePath("/admin", "layout");
-  await audit(actor, "SUBMISSION_REVIEWED", "TaskSubmission", submission.id, { decision: data.decision });
+  await audit(actor, "SUBMISSION_REVIEWED", "TaskSubmission", submission.id, { decision: data.decision, late: submission.late, latePenaltyPoints: penalty, pointsAwarded: awarded });
   const approved = data.decision === "APPROVED";
   const type = approved ? "SUBMISSION_APPROVED" : data.decision === "REJECTED" ? "SUBMISSION_REJECTED" : "SUBMISSION_CHANGES_REQUESTED";
   await notifyAndEmail({
     userId: submission.student.id, email: submission.student.email, recipientName: submission.student.name ?? "Student",
     type, title: approved ? "Submission approved" : data.decision === "REJECTED" ? "Submission not approved" : "Changes requested",
-    body: `${submission.task.title}: ${data.feedback}`, link: `/student/tasks/${submission.task.id}`,
+    body: `${submission.task.title}: ${data.feedback}${approved && submission.late ? ` Late submission penalty: ${penalty} point${penalty === 1 ? "" : "s"}. Final score: ${awarded}/${submission.task.points}.` : ""}`, link: `/student/tasks/${submission.task.id}`,
     templateKey: approved ? "submission_approved" : "submission_rejected",
     variables: { itemTitle: submission.task.title, feedback: data.feedback },
   });

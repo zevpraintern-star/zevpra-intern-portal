@@ -17,10 +17,10 @@ export default async function AdminDashboard() {
     <>
       <PageHeader title="Dashboard" description="Aggregate numbers only: open a section to see individual records." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total students" value={t.totalStudents} hint={`${t.new7} new in 7 days · ${t.new30} in 30 days`} />
+        {link("Total students", t.totalStudents, "/admin/students", "students.view")}
         {link("Pending applications", t.pendingApplications, "/admin/applications", "applications.review")}
-        <Stat label="Active internships" value={t.activeInternships} />
-        <Stat label="Completed internships" value={t.completedInternships} />
+        {link("Active internships", t.activeInternships, "/admin/enrollments?status=IN_PROGRESS", "students.view")}
+        {link("Completed internships", t.completedInternships, "/admin/enrollments?status=COMPLETED", "students.view")}
         {link("Pending submissions", t.pendingTaskSubmissions + t.pendingProjectReviews, "/admin/submissions", "tasks.review")}
         {link("Certificates awaiting release", t.certificatesToPrepare, "/admin/certificates", "certificates.issue")}
         {link("Issued certificates", t.issuedCertificates, "/admin/certificates", "certificates.issue")}

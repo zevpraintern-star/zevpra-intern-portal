@@ -13,6 +13,7 @@ import { formatDate, formatDateTime } from "@/lib/utils/format";
 import { getStudentTask } from "@/server/services/tasks";
 import { submitTaskAction } from "@/app/student/actions";
 import { taskDurationLabel } from "@/lib/difficulty";
+import { deadlineAfterDays, taskDeadlineDays } from "@/lib/difficulty";
 
 export default async function TaskPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ flash?: string }> }) {
   const { flash } = await searchParams;
@@ -24,7 +25,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const latest = submissions[0];
   const closed = latest && (["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(latest.status));
   const attemptsLeft = task.maxAttempts - submissions.length;
-  const deadline = assignment.dueAt ?? task.deadline;
+  const deadline = assignment.dueAt ?? task.deadline ?? deadlineAfterDays(taskDeadlineDays(task.difficulty), assignment.assignedAt);
   const overdue = deadline && deadline.getTime() < Date.now();
   const type = task.submissionType;
 
@@ -54,9 +55,9 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
         </div>
 
         <Card className="h-fit"><CardHeader><CardTitle>{closed ? "Submission" : "Submit your work"}</CardTitle></CardHeader><CardContent>
-          {latest?.status === "APPROVED" ? <Alert variant="success">This task is approved. Nice work.</Alert>
+          {overdue && !latest ? <Alert variant="warning">The deadline passed. You can still submit; only this task loses 10% of its maximum marks for a late submission.</Alert> : null}
+          {latest?.status === "APPROVED" ? <Alert variant="success">This task is approved. Score: {latest.pointsAwarded ?? 0}/{task.points}{latest.latePenaltyPoints ? ` after a ${latest.latePenaltyPoints}-point late penalty` : ""}.</Alert>
           : closed ? <Alert>Your submission is waiting for review. You can resubmit only if changes are requested.</Alert>
-          : overdue ? <Alert variant="destructive">The deadline for this task has passed.</Alert>
           : attemptsLeft <= 0 ? <Alert variant="destructive">You have used all attempts for this task.</Alert>
           : (
             <ActionForm action={submitTaskAction} resetOnSuccess>

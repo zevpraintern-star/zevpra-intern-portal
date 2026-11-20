@@ -539,6 +539,17 @@ const EMAIL_TEMPLATES: SeedEmailTemplate[] = [
     text: "New task assigned: {{taskTitle}}. Due: {{dueDate}}",
   },
   {
+    key: "deadline_reminder",
+    name: "Task and project deadline reminder",
+    subject: "Reminder: {{itemType}} deadline in 5 hours",
+    html: emailShell("Deadline reminder", [
+      "Hello {{recipientName}},",
+      "Your {{itemType}} <strong>{{itemTitle}}</strong> is due at {{dueAt}}.",
+      "Submit before the deadline to avoid a 10% deduction from this item's maximum marks.",
+    ], "Open your work"),
+    text: "Your {{itemType}} {{itemTitle}} is due at {{dueAt}}. Submit before the deadline to avoid a 10% deduction from this item's maximum marks: {{actionUrl}}",
+  },
+  {
     key: "submission_received",
     name: "Submission received",
     subject: "We received your submission",

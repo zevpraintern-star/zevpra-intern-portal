@@ -8,6 +8,8 @@ import { plainTextSchema, requiredTextSchema, uuidSchema } from "@/lib/validatio
 import { audit, type Actor } from "@/server/services/audit";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { taskScope } from "@/server/services/progress";
+import { deadlineAfterDays, taskDeadlineDays } from "@/lib/difficulty";
+import { enqueueJob } from "@/server/jobs/queue";
 
 export const applySchema = z.object({
   programId: uuidSchema,
@@ -162,31 +164,53 @@ export async function assignPublishedTasks(
   db: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
   application: { studentId: string; programId: string; domainId: string },
 ): Promise<number> {
-  const tasks = await db.task.findMany({ where: taskScope(application), select: { id: true, deadline: true } });
+  const tasks = await db.task.findMany({ where: taskScope(application), select: { id: true, deadline: true, difficulty: true } });
   if (tasks.length === 0) return 0;
+  const assignedAt = new Date();
+  const assignments = tasks.map((task) => ({
+    taskId: task.id,
+    studentId: application.studentId,
+    dueAt: task.deadline ?? deadlineAfterDays(taskDeadlineDays(task.difficulty), assignedAt),
+  }));
   const created = await db.taskAssignment.createMany({
-    data: tasks.map((t) => ({ taskId: t.id, studentId: application.studentId, dueAt: t.deadline })),
+    data: assignments,
     skipDuplicates: true,
   });
+  for (const assignment of assignments) {
+    if (assignment.dueAt.getTime() <= Date.now()) continue;
+    await enqueueJob("NOTIFICATION", { kind: "TASK_DEADLINE_REMINDER", taskId: assignment.taskId, studentId: assignment.studentId }, {
+      dedupeKey: `deadline-task:${assignment.taskId}:${assignment.studentId}`,
+      runAt: new Date(Math.max(Date.now(), assignment.dueAt.getTime() - 5 * 60 * 60_000)),
+    }, db);
+  }
   return created.count;
 }
 
 /** When a task is published later, hand it to every already-approved student. */
 export async function assignTaskToEnrolled(taskId: string): Promise<number> {
   const prisma = getPrisma();
-  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true, programId: true, domainId: true, deadline: true, status: true, title: true } });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true, programId: true, domainId: true, deadline: true, difficulty: true, status: true, title: true } });
   if (!task || task.status !== "PUBLISHED") return 0;
   const apps = await prisma.application.findMany({
     where: { programId: task.programId, status: "APPROVED", completionStatus: { not: "COMPLETED" }, ...(task.domainId ? { domainId: task.domainId } : {}) },
     select: { studentId: true, student: { select: { email: true, name: true } } },
   });
   if (apps.length === 0) return 0;
+  const assignedAt = new Date();
+  const assignments = apps.map((a) => ({ taskId: task.id, studentId: a.studentId, dueAt: task.deadline ?? deadlineAfterDays(taskDeadlineDays(task.difficulty), assignedAt) }));
   const created = await prisma.taskAssignment.createMany({
-    data: apps.map((a) => ({ taskId: task.id, studentId: a.studentId, dueAt: task.deadline })),
+    data: assignments,
     skipDuplicates: true,
   });
   if (created.count > 0) {
     revalidatePath("/student", "layout");
+    for (const assignment of assignments) {
+      if (assignment.dueAt.getTime() <= Date.now()) continue;
+      await enqueueJob("NOTIFICATION", { kind: "TASK_DEADLINE_REMINDER", taskId: assignment.taskId, studentId: assignment.studentId }, {
+        dedupeKey: `deadline-task:${assignment.taskId}:${assignment.studentId}`,
+        runAt: new Date(Math.max(Date.now(), assignment.dueAt.getTime() - 5 * 60 * 60_000)),
+      });
+    }
     for (const a of apps) {
       await notifyAndEmail({
         userId: a.studentId, email: a.student.email, recipientName: a.student.name ?? "Student",

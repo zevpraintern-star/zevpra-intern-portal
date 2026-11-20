@@ -90,6 +90,17 @@ export const FALLBACK_EMAIL_TEMPLATES: Record<string, EmailTemplateDefinition> =
     bodyText:
       "Your {{companyName}} {{purposeLabel}} OTP is {{code}}. Use it to {{purposeAction}}. It expires in {{expiryMinutes}} minutes.",
   },
+  deadline_reminder: {
+    key: "deadline_reminder",
+    name: "Task and project deadline reminder",
+    subject: "Reminder: {{itemType}} deadline in 5 hours",
+    bodyHtml: shell("Deadline reminder", [
+      "Hello {{recipientName}},",
+      "Your {{itemType}} <strong>{{itemTitle}}</strong> is due at {{dueAt}}.",
+      "Submit before the deadline to avoid a 10% deduction from this item's maximum marks.",
+    ], "Open your work"),
+    bodyText: "Your {{itemType}} {{itemTitle}} is due at {{dueAt}}. Submit before the deadline to avoid a 10% deduction from this item's maximum marks: {{actionUrl}}",
+  },
   welcome: {
     key: "welcome",
     name: "Welcome",

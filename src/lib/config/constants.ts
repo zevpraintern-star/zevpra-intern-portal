@@ -196,6 +196,7 @@ export const ESSENTIAL_EMAIL_TEMPLATES = new Set<string>([
   "certificate_issued",
   // Security
   "security_alert",
+  "deadline_reminder",
 ]);
 
 export function isEssentialEmailTemplate(templateKey: string): boolean {

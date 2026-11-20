@@ -11,6 +11,8 @@ import { getOwnApplication } from "@/server/services/applications";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { computeProgress, refreshProgress } from "@/server/services/progress";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
+import { deadlineAfterDays, latePenalty, projectDeadlineDays } from "@/lib/difficulty";
+import { approvedTaskMarks, scoreBreakdown } from "@/server/services/scoring";
 
 export const selectProjectSchema = z.object({ applicationId: uuidSchema, projectId: uuidSchema });
 
@@ -21,7 +23,7 @@ export async function getProjectStage(studentId: string, applicationId: string) 
   const projects = progress.tasksComplete
     ? await getPrisma().project.findMany({
         where: { programId: application.programId, status: "PUBLISHED" },
-        select: { id: true, title: true, description: true, requirements: true, skills: true, difficulty: true },
+        select: { id: true, title: true, description: true, requirements: true, skills: true, difficulty: true, deadline: true },
         orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
       })
     : [];
@@ -50,7 +52,7 @@ export async function selectProject(studentId: string, input: z.infer<typeof sel
 
   const project = await getPrisma().project.findFirst({
     where: { id: data.projectId, programId: application.programId, status: "PUBLISHED" },
-    select: { id: true, title: true, difficulty: true },
+    select: { id: true, title: true, difficulty: true, deadline: true },
   });
   if (!project) throw new NotFoundError("Project not found.");
 
@@ -62,7 +64,18 @@ export async function selectProject(studentId: string, input: z.infer<typeof sel
     if (existing) throw new ConflictError("Your project is locked after you submit it. Ask an administrator to reset it.");
   }
 
-  await getPrisma().application.update({ where: { id: application.id }, data: { selectedProjectId: project.id } });
+  const selectedAt = new Date();
+  const dueAt = application.selectedProjectId === project.id && application.selectedProjectDueAt
+    ? application.selectedProjectDueAt
+    : project.deadline ?? deadlineAfterDays(projectDeadlineDays(project.difficulty), selectedAt);
+  await getPrisma().application.update({ where: { id: application.id }, data: { selectedProjectId: project.id, selectedProjectDueAt: dueAt } });
+  if (dueAt.getTime() > Date.now()) {
+    await enqueueJob("NOTIFICATION", { kind: "PROJECT_DEADLINE_REMINDER", applicationId: application.id, projectId: project.id }, {
+      dedupeKey: `deadline-project:${application.id}:${project.id}`,
+      runAt: new Date(Math.max(Date.now(), dueAt.getTime() - 5 * 60 * 60_000)),
+    });
+  }
+  kickJobs();
   await refreshProgress(application.id);
   await audit(actor, "PROJECT_UPDATED", "Application", application.id, { selectedProjectId: project.id });
   return project;
@@ -75,7 +88,7 @@ export async function submitProject(studentId: string, applicationId: string, in
 
   const project = await getPrisma().project.findFirst({
     where: { id: data.projectId, programId: application.programId, status: "PUBLISHED" },
-    select: { id: true, title: true, difficulty: true },
+    select: { id: true, title: true, difficulty: true, deadline: true, maxScore: true },
   });
   if (!project) throw new NotFoundError("Project not found.");
 
@@ -84,6 +97,10 @@ export async function submitProject(studentId: string, applicationId: string, in
   });
   if (existing && ["SUBMITTED", "UNDER_REVIEW"].includes(existing.status)) throw new ConflictError("Your project is already awaiting review.");
   if (existing?.status === "APPROVED") throw new ConflictError("Your project is already approved.");
+
+  const dueAt = project.deadline ?? application.selectedProjectDueAt;
+  const submittedAt = new Date();
+  const isLate = Boolean(dueAt && submittedAt.getTime() > dueAt.getTime());
 
   const repoTaken = await getPrisma().projectSubmission.findFirst({
     where: { githubUrl: { equals: data.githubUrl, mode: "insensitive" }, studentId: { not: studentId } },
@@ -95,7 +112,7 @@ export async function submitProject(studentId: string, applicationId: string, in
   }
 
   const submission = await getPrisma().$transaction(async (tx) => {
-    const base = { githubUrl: data.githubUrl, liveUrl: data.liveUrl, notes: data.notes, status: "SUBMITTED" as const, submittedAt: new Date(), reviewedById: null, reviewedAt: null, feedback: null, score: null, repoCheckStatus: "PENDING", repoCheckedAt: null };
+    const base = { githubUrl: data.githubUrl, liveUrl: data.liveUrl, notes: data.notes, status: "SUBMITTED" as const, submittedAt, late: isLate, latePenaltyPoints: 0, reviewedById: null, reviewedAt: null, feedback: null, score: null, repoCheckStatus: "PENDING", repoCheckedAt: null };
     const row = existing
       ? await tx.projectSubmission.update({ where: { id: existing.id }, data: base })
       : await tx.projectSubmission.create({ data: { projectId: project.id, studentId, ...base } });
@@ -141,34 +158,21 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
     select: { id: true, programId: true, domainId: true },
   });
   if (!application) throw new NotFoundError("The student's application could not be found.");
+  const penalty = data.decision === "APPROVED" && submission.late ? latePenalty(submission.project.maxScore, data.score ?? 0) : 0;
+  const awarded = data.decision === "APPROVED" ? Math.max(0, (data.score ?? 0) - penalty) : (data.score ?? null);
   const claimed = await prisma.$transaction(async (tx) => {
     const result = await tx.projectSubmission.updateMany({
       where: { id: submission.id, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
-      data: { status: data.decision, feedback: data.feedback, score: data.score ?? null, reviewedById: actor.userId ?? null, reviewedAt: new Date() },
+      data: { status: data.decision, feedback: data.feedback, score: awarded, latePenaltyPoints: penalty, reviewedById: actor.userId ?? null, reviewedAt: new Date() },
     });
     if (result.count === 0) throw new ConflictError("This submission was already reviewed.");
 
-    let scoreSummary: { percent: number; eligible: boolean } | null = null;
+    let scoreSummary: { percent: number; taskPercent: number; projectPercent: number; eligible: boolean } | null = null;
     if (data.decision === "APPROVED") {
-      const taskMarks = await tx.taskSubmission.findMany({
-        where: {
-          studentId: submission.studentId,
-          status: "APPROVED",
-          task: { programId: application.programId, OR: [{ domainId: null }, { domainId: application.domainId }] },
-        },
-        orderBy: [{ taskId: "asc" }, { attemptNumber: "desc" }],
-        select: { taskId: true, pointsAwarded: true, task: { select: { points: true } } },
-      });
-      const latestMarks = new Map<string, { earned: number; possible: number }>();
-      for (const mark of taskMarks) {
-        if (!latestMarks.has(mark.taskId)) latestMarks.set(mark.taskId, { earned: mark.pointsAwarded ?? 0, possible: mark.task.points });
-      }
-      const taskEarned = [...latestMarks.values()].reduce((sum, mark) => sum + mark.earned, 0);
-      const taskPossible = [...latestMarks.values()].reduce((sum, mark) => sum + mark.possible, 0);
-      const totalEarned = taskEarned + data.score!;
-      const totalPossible = taskPossible + submission.project.maxScore;
-      const eligible = totalPossible > 0 && totalEarned * 100 > totalPossible * CERTIFICATE_MIN_SCORE_PERCENT;
-      scoreSummary = { percent: totalPossible > 0 ? Number(((totalEarned / totalPossible) * 100).toFixed(2)) : 0, eligible };
+      const taskMarks = await approvedTaskMarks(tx, { studentId: submission.studentId, programId: application.programId, domainId: application.domainId });
+      const scores = scoreBreakdown(taskMarks, awarded ?? 0, submission.project.maxScore);
+      const eligible = scores.overallPercent > CERTIFICATE_MIN_SCORE_PERCENT;
+      scoreSummary = { percent: scores.overallPercent, taskPercent: scores.taskPercent, projectPercent: scores.projectPercent, eligible };
 
       const now = new Date();
       await tx.internshipCompletion.upsert({
@@ -195,7 +199,7 @@ export async function reviewProjectSubmission(actor: Actor, input: z.infer<typeo
   const approved = data.decision === "APPROVED";
   revalidatePath("/student", "layout");
   revalidatePath("/admin", "layout");
-  await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision });
+  await audit(actor, approved ? "COMPLETION_APPROVED" : "COMPLETION_REJECTED", "ProjectSubmission", submission.id, { decision: data.decision, late: submission.late, latePenaltyPoints: penalty, projectScore: awarded, ...(claimed.scoreSummary ? { taskScorePercent: claimed.scoreSummary.taskPercent, projectScorePercent: claimed.scoreSummary.projectPercent, overallScorePercent: claimed.scoreSummary.percent } : {}) });
   if (approved && claimed.scoreSummary?.eligible) {
     await audit(actor, "CERTIFICATE_ELIGIBLE", "Application", application.id, { free: true, awaitingAdminRelease: true, scorePercent: claimed.scoreSummary.percent });
   }

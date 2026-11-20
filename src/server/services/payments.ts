@@ -14,6 +14,7 @@ import { assertAttachableFiles } from "@/server/services/files";
 import { notifyAndEmail } from "@/server/services/notifications";
 import { getPaymentSettings } from "@/server/services/settings";
 import { enqueueJob, kickJobs } from "@/server/jobs/queue";
+import { approvedTaskMarks, scoreBreakdown } from "@/server/services/scoring";
 
 /** What the student's payment page shows. Eligibility is decided here, never in the UI. */
 export async function getPaymentView(studentId: string, applicationId: string) {
@@ -123,7 +124,7 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
     include: {
       student: { select: { id: true, email: true, name: true, studentProfile: { select: { fullName: true, college: true } } } },
       program: { select: { id: true, title: true, durationLabel: true, difficulty: true, domain: { select: { name: true } } } },
-      application: { select: { id: true, completedAt: true } },
+      application: { select: { id: true, studentId: true, programId: true, domainId: true, selectedProjectId: true, completedAt: true } },
     },
   });
   if (!payment) throw new NotFoundError("Payment not found.");
@@ -134,6 +135,7 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
       data: { status: "REJECTED", rejectionReason: data.reason, reviewedById: actor.userId ?? null, reviewedAt: new Date() },
     });
     if (moved.count === 0) throw new ConflictError("This payment was already reviewed.");
+
     await audit(actor, "PAYMENT_REJECTED", "PaymentRequest", payment.id, { reason: data.reason });
     await notifyAndEmail({
       userId: payment.student.id, email: payment.student.email, recipientName: payment.student.name ?? "Student", type: "PAYMENT_REJECTED",
@@ -152,6 +154,15 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
     });
     if (moved.count === 0) throw new ConflictError("This payment was already reviewed.");
 
+    const taskMarks = await approvedTaskMarks(tx, payment.application);
+    const finalProject = payment.application.selectedProjectId
+      ? await tx.projectSubmission.findUnique({
+          where: { projectId_studentId: { projectId: payment.application.selectedProjectId, studentId: payment.application.studentId } },
+          select: { score: true, project: { select: { maxScore: true } } },
+        })
+      : null;
+    const scores = scoreBreakdown(taskMarks, finalProject?.score ?? 0, finalProject?.project.maxScore ?? 0);
+
     const template = selectCertificateTemplate(await tx.certificateTemplate.findMany(), payment.program.difficulty);
     const verificationId = randomCode(CERTIFICATE.verificationIdLength);
     const row = await tx.certificate.create({
@@ -163,6 +174,9 @@ export async function reviewPayment(actor: Actor, input: z.infer<typeof paymentR
         snapshotStudentName: profile?.fullName ?? payment.student.name ?? "Student",
         snapshotProgramTitle: payment.program.title, snapshotDomainName: payment.program.domain.name,
         snapshotDuration: payment.program.durationLabel, snapshotCollege: profile?.college,
+        taskScorePercent: scores.taskPercent,
+        projectScorePercent: scores.projectPercent,
+        overallScorePercent: scores.overallPercent,
         projectDifficulty: payment.program.difficulty,
         completionDate: payment.application.completedAt,
       },

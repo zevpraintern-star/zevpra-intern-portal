@@ -43,7 +43,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             <Link key={t.id} href={`/student/tasks/${t.id}`} className="block">
               <Card className="transition-colors hover:border-primary/50"><CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
                 <div className="min-w-0"><p className="font-medium"><span className="mr-2 text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>{t.title}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{t.difficulty.toLowerCase()} · {taskDurationLabel(t.difficulty)} estimated · {t.points} pts{t.dueAt ? ` · due ${formatDate(t.dueAt)}` : ""}{t.latest ? ` · attempt ${t.latest.attemptNumber}/${t.maxAttempts}` : ""}</p></div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{t.difficulty.toLowerCase()} · {taskDurationLabel(t.difficulty)} estimated · {t.points} pts{t.dueAt ? ` · due ${formatDate(t.dueAt)}` : ""}{t.latest?.late ? " · submitted late" : ""}{t.latest?.status === "APPROVED" ? ` · score ${t.latest.pointsAwarded ?? 0}/${t.points}${t.latest.latePenaltyPoints ? ` (−${t.latest.latePenaltyPoints} late penalty)` : ""}` : ""}{t.latest ? ` · attempt ${t.latest.attemptNumber}/${t.maxAttempts}` : ""}</p></div>
                 <StatusBadge value={t.latest && t.assignmentStatus !== "COMPLETED" ? t.latest.status : t.assignmentStatus} />
               </CardContent></Card>
             </Link>
