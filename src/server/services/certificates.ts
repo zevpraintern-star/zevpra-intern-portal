@@ -162,6 +162,40 @@ export async function renderCertificatePdf(cert: {
     page.drawText(value, { x: x + (colW - sansBold.widthOfTextAtSize(value, valueSize)) / 2, y: scoreY + 11, size: valueSize, font: sansBold, color: ink });
   });
 
+  // Draw original vector merit medals in the open space below the certificate
+  // heading. These are made from PDF shapes and text, with no external artwork.
+  const overall = cert.overallScorePercent;
+  const awards = overall !== null && overall !== undefined
+    ? overall >= 76 && overall <= 100
+      ? [{ label: "SILVER", color: rgb(0.64, 0.69, 0.76), light: rgb(0.9, 0.92, 0.95), dark: rgb(0.39, 0.46, 0.55) }, { label: "GOLD", color: rgb(0.9, 0.68, 0.2), light: rgb(1, 0.93, 0.7), dark: rgb(0.68, 0.43, 0.08) }]
+      : overall >= 61 && overall <= 75
+        ? [{ label: "SILVER", color: rgb(0.64, 0.69, 0.76), light: rgb(0.9, 0.92, 0.95), dark: rgb(0.39, 0.46, 0.55) }]
+        : []
+    : [];
+  const awardGap = 104;
+  const awardStart = contentCenter - ((awards.length - 1) * awardGap) / 2;
+  awards.forEach((award, index) => {
+    const cx = awardStart + index * awardGap;
+    const cy = 451;
+    // Short ribbon tails sit behind the medallion, creating a compact award silhouette.
+    page.drawRectangle({ x: cx - 12, y: cy - 32, width: 8, height: 29, color: award.dark, borderColor: white, borderWidth: 0.5 });
+    page.drawRectangle({ x: cx + 4, y: cy - 32, width: 8, height: 29, color: award.color, borderColor: white, borderWidth: 0.5 });
+    page.drawLine({ start: { x: cx - 12, y: cy - 25 }, end: { x: cx - 4, y: cy - 25 }, thickness: 0.8, color: award.light });
+    page.drawLine({ start: { x: cx + 4, y: cy - 25 }, end: { x: cx + 12, y: cy - 25 }, thickness: 0.8, color: award.light });
+    page.drawCircle({ x: cx, y: cy, size: 22, color: award.dark, borderColor: white, borderWidth: 0.8 });
+    page.drawCircle({ x: cx, y: cy, size: 18, color: award.color, borderColor: award.light, borderWidth: 1.2 });
+    page.drawCircle({ x: cx, y: cy, size: 13.5, color: award.light, borderColor: white, borderWidth: 0.7 });
+    const monogram = "Z";
+    const monogramSize = 16;
+    page.drawText(monogram, { x: cx - serifBold.widthOfTextAtSize(monogram, monogramSize) / 2, y: cy - 5.5, size: monogramSize, font: serifBold, color: award.dark });
+    const brand = "ZEVPRA INTERN AWARD";
+    const brandSize = 6.5;
+    page.drawText(brand, { x: cx - sansBold.widthOfTextAtSize(brand, brandSize) / 2, y: cy - 42, size: brandSize, font: sansBold, color: muted });
+    const level = award.label;
+    const levelSize = 6;
+    page.drawText(level, { x: cx - sansBold.widthOfTextAtSize(level, levelSize) / 2, y: cy - 51, size: levelSize, font: sansBold, color: award.dark });
+  });
+
   page.drawText(`COMPLETED  ${formatLongDate(cert.completionDate)}`, { x: contentLeft, y: 73, size: 8, font: sans, color: muted });
   page.drawText(`ISSUED  ${formatLongDate(cert.issueDate)}`, { x: contentCenter + 10, y: 73, size: 8, font: sans, color: muted });
   page.drawText(`CERTIFICATE ID  ${safe(sansBold, cert.certificateId)}`, { x: contentLeft, y: 55, size: 8.5, font: sansBold, color: ink });
