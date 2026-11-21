@@ -43,6 +43,27 @@ function SampleQr() {
   );
 }
 
+function AwardMedal({ tone }: { tone: "silver" | "gold" }) {
+  const colors = tone === "gold"
+    ? { dark: "#a96b12", mid: "#e9b94f", light: "#fff0b5", ribbon: "#b87819" }
+    : { dark: "#687687", mid: "#b8c2ce", light: "#f2f5f8", ribbon: "#788594" };
+
+  return (
+    <div className="flex min-w-0 flex-col items-center" aria-label={`Zevpra Intern Award, ${tone} medal`}>
+      <svg viewBox="0 0 48 58" className="h-11 w-10 drop-shadow-[0_3px_6px_rgba(0,0,0,0.3)] sm:h-12 sm:w-10" aria-hidden="true">
+        <path d="M12 30h9l-2 19-7-5-7 5 2-18z" fill={colors.ribbon} stroke={colors.light} strokeOpacity=".5" />
+        <path d="M27 30h9l5 1 2 18-7-5-7 5z" fill={colors.mid} stroke={colors.light} strokeOpacity=".5" />
+        <circle cx="24" cy="22" r="19" fill={colors.dark} />
+        <circle cx="24" cy="22" r="16" fill={colors.mid} stroke={colors.light} strokeWidth="1.5" />
+        <circle cx="24" cy="22" r="11.5" fill={colors.light} fillOpacity=".28" stroke={colors.light} strokeOpacity=".8" />
+        <text x="24" y="27" textAnchor="middle" fill={colors.light} fontFamily="Georgia,serif" fontSize="15" fontWeight="700">Z</text>
+      </svg>
+      <span className="mt-0.5 whitespace-nowrap text-[0.48rem] font-bold tracking-[0.08em] text-[#f5f1e6]/80 sm:text-[0.55rem]">ZEVPRA INTERN AWARD</span>
+      <span className="text-[0.48rem] font-semibold uppercase tracking-[0.18em]" style={{ color: colors.mid }}>{tone}</span>
+    </div>
+  );
+}
+
 function SampleCertificate({ companyName, domain }: { companyName: string; domain: string }) {
   return (
     <SpotlightCard
@@ -61,6 +82,10 @@ function SampleCertificate({ companyName, domain }: { companyName: string; domai
         <div>
           <p className="font-display text-sm font-semibold sm:text-lg">{companyName}</p>
           <p className="mt-1 text-[0.65rem] text-[#f5f1e6]/60 sm:text-xs">Certificate of completion</p>
+          <div className="mt-2 flex items-center gap-1.5 text-[0.55rem] text-[#f5f1e6]/65 sm:text-[0.65rem]">
+            <span className="uppercase tracking-[0.14em]">Overall score</span>
+            <span className="font-semibold text-[#ffd98a]">90%</span>
+          </div>
         </div>
 
         <div className="text-center">
@@ -75,6 +100,10 @@ function SampleCertificate({ companyName, domain }: { companyName: string; domai
             Python Development Internship
           </p>
           <p className="mt-1 text-[0.65rem] text-[#f5f1e6]/60 sm:text-xs">Online · 8 weeks</p>
+          <div className="mt-2 flex items-start justify-center gap-5 sm:gap-8">
+            <AwardMedal tone="silver" />
+            <AwardMedal tone="gold" />
+          </div>
         </div>
 
         <div className="flex items-end justify-between gap-4">
