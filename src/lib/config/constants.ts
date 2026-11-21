@@ -126,6 +126,7 @@ export const STUDENT_NAV = [
   { key: "internship", label: "My Internship", href: "/student/internship" },
   { key: "tasks", label: "Tasks", href: "/student/tasks" },
   { key: "projects", label: "Projects", href: "/student/projects" },
+  { key: "help", label: "Help & Guides", href: "/student/help" },
   { key: "submissions", label: "Submissions", href: "/student/submissions" },
   { key: "progress", label: "Progress", href: "/student/progress" },
   { key: "announcements", label: "Announcements", href: "/student/announcements" },

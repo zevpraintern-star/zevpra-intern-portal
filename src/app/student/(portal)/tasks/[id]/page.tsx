@@ -1,4 +1,5 @@
 import { Flash } from "@/components/dashboard/flash";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
@@ -33,6 +34,9 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
     <>
       <Flash flash={flash} />
       <PageHeader title={task.title} description={`${task.difficulty.toLowerCase()} · ${taskDurationLabel(task.difficulty)} estimated · ${task.points} points`} actions={<StatusBadge value={assignment.status} />} />
+      <Alert className="mb-6" title="Not sure how to complete or submit this task?">
+        Follow the <Link className="font-medium text-primary underline" href="/student/help">step-by-step task and GitHub guide</Link>. This page&apos;s instructions and submission fields tell you what to send for this task.
+      </Alert>
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <div className="space-y-6">
           <Card><CardHeader><CardTitle>Instructions</CardTitle></CardHeader><CardContent className="space-y-4 text-sm leading-relaxed">

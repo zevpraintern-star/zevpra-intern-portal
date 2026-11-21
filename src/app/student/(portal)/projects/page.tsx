@@ -1,6 +1,7 @@
 
 import { Flash } from "@/components/dashboard/flash";
 import { Lock } from "lucide-react";
+import Link from "next/link";
 
 import { ActionForm, SubmitButton } from "@/components/forms/action-form";
 import { TextArea, TextField } from "@/components/forms/fields";
@@ -115,6 +116,9 @@ export default async function ProjectsPage({
       />
 
       <Flash flash={sp.flash} />
+      <Alert className="mb-6" title="Need help building or submitting your project?">
+        Use the <Link className="font-medium text-primary underline" href="/student/help">project and GitHub step-by-step guide</Link> for the repository upload, live demo, and submission checklist.
+      </Alert>
 
       {sub?.status === "APPROVED" ? (
         <Alert
